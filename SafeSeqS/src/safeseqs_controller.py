@@ -11,6 +11,7 @@ import platform
 import logging
 
 import unique
+
 #safeseqs_controller - This process runs the analytical steps of the SAFESEQS pipeline.
 
 class StopStep(Exception):
@@ -51,7 +52,7 @@ def get_args():
 
  
 #The controller needs a file that provides processing parameters including specification
-#of data files.  The file must be in the Study Data directory and must be named 'safeseqs.parms.json'.
+#of data files.  The file must be in the Study Data directory and must be named 'safeseqs.json'.
 #Format of the file is:
 #
 # {"reads_pattern" :   "",
@@ -63,7 +64,7 @@ def get_args():
 def getSAFESEQSParams():
     missing_parms = False
     
-    safeseqs_file = os.path.join(args.directory, 'safeseqs.parms.json') 
+    safeseqs_file = os.path.join(args.directory, 'safeseqs.json') 
     with open(safeseqs_file) as json_file:    
         parms = json.load(json_file)
 
@@ -141,7 +142,7 @@ def set_fh_limit():
     #Return a smaller number for the controller to work with to allow for additional open file handles.        
     fh_limit = fh_limit-20
         
-    return (fh_limit-20)
+    return (fh_limit)
 
 
 #Write the step and data set name to the checkpoint file
@@ -374,6 +375,7 @@ def loop_pairs(parms, first_pass):
                     
                     if total_reads % 1000000 == 0:
                         logging.info(' merged %s reads', str(total_reads))
+                        print(' merged:' + str(total_reads))
                         
                     #temporary break for output size
                     #if total_reads==100:
@@ -492,7 +494,7 @@ def run_sort_unique(parms):
         #if there are still files to process 
         if current_file < len(barcodemap_list):
             #check to see if the read file was completed on a previous run.
-            if barcodemap_list[current_file] == 'merge' or is_done('unique', str(barcodemap_list[current_file])):
+            if barcodemap_list[current_file] == 'bad' or barcodemap_list[current_file] == 'merge' or is_done('unique', str(barcodemap_list[current_file])):
                 current_file+=1
                 continue
             
@@ -510,7 +512,9 @@ def run_sort_unique(parms):
                     os.makedirs(family_directory)
                 family_file = os.path.join(family_directory, barcodemap_list[current_file]+'.family')
                 
-                unique_args = Namespace(input=read, output=result_file, family=family_file)
+                primerset_file = os.path.join(args.directory, 'Primers.txt')                 
+                
+                unique_args = Namespace(input=read, output=result_file, family=family_file, primerset=primerset_file)
                
                 p = multiprocessing.Process(target=unique.perform_unique, name=barcodemap_list[current_file], args=(unique_args,))
                 p.start()

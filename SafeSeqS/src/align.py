@@ -97,8 +97,6 @@ def perform_align(args):
             unique_cnt += 1
             #For each line, create a data record with the value of the line (tab separated)
             u = UniqueSeqRecord(*line.strip().split('\t'))
-            #retrieve the specific primer info from primer_dict
-            p = primer_dict[u.primerMatch]
              
             test_seq = 'NULL'
             mismatch_cnt = 0
@@ -107,6 +105,8 @@ def perform_align(args):
             del_bases = 0            
 
             if u.read1_match == 'Perfect Match' and u.read2_match == 'Perfect Match':
+                #retrieve the specific primer info from primer_dict
+                p = primer_dict[u.primerMatch]
                 
                 #test sequence is found in the read sequence between the read1 and read2 primer sequences
                 if p.readStrand == '+':

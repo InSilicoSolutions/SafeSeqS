@@ -107,6 +107,16 @@ def getSAFESEQSParams():
     if 'uidLength' not in parms:
         print 'Missing uidLength from Settings file'
         missing_parms =True
+
+    if 'load_bad_bc' not in settings:
+        parms['load_bad_bc'] = False
+    else:
+        parms['load_bad_bc'] = parms['load_bad_bc'].lower()
+        if parms['load_bad_bc'] == "yes" or parms['load_bad_bc'] == "y":
+            parms['load_bad_bc'] = True
+        else:
+            parms['load_bad_bc'] = False
+        
             
     if 'load_not_used_bc' not in settings:
         parms['load_not_used_bc'] = False

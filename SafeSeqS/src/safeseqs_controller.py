@@ -11,6 +11,7 @@ import platform
 import logging
 
 import unique
+import align
 
 #safeseqs_controller - This process runs the analytical steps of the SAFESEQS pipeline.
 
@@ -51,7 +52,8 @@ def get_args():
     return     
 
  
-#The controller needs a file that provides processing parameters including specification
+#The controller needs two files that provide parameters and run settings.
+#The first file provides processing parameters including the specification
 #of data files.  The file must be in the Study Data directory and must be named 'safeseqs.json'.
 #Format of the file is:
 #
@@ -60,6 +62,14 @@ def get_args():
 #  "reads_files" : ["fastq file 1 (just file name - must be in Study Data Directory", "fastq file 2", ... ],
 #  "barcodes_files" : ["barcode file 1", "barcode file 2", ...],
 #  "barcodemap" : "well barcode association file"}
+#
+#The settings file contains parameters that are common groupings for a given lab. The file should exist in the data directory.
+#Format of the file is:
+#
+# {"uidLength" :   14,
+#  "load_not_used_bc" : "N", (Optional: valid values are YES, Y, NO, N. It is not case sensitive and defaults to NO. 
+#  "save_merge" : : "N"} (Optional: valid values are YES, Y, NO, N. It is not case sensitive and defaults to NO. 
+#
 
 def getSAFESEQSParams():
     missing_parms = False
@@ -224,7 +234,9 @@ def split_inputs(parms):
     global reads_with_bc_not_used
     
     #load the barcode maplist into memory. this list will be used by split and later steps
-    load_barcodes(parms)
+    load_barcodes(parms)    
+    logging.info('File Handle Limit: %i' % fh_limit)  
+    logging.info('Number of Split Barcodes files needed: %i' % len(barcodemap_list))  
     
     if skip_step('split') or is_done('split', 'all'):
         return
@@ -236,7 +248,7 @@ def split_inputs(parms):
     split_directory = os.path.join(parms['resultsDir'], "split")
     if not os.path.isdir(split_directory):
         os.makedirs(split_directory)
-    
+        
     start = 0
     first_pass = True
     
@@ -328,33 +340,33 @@ def loop_pairs(parms, first_pass):
             i = 0       
     
             #Process all the reads in the fastq reads file one read at a time.  
+            #Reads have four lines in each file. As each line is read collect the pertinent info.
             #As a line is read from the fastq reads file, the corresponding 
             #index is read.
             for read, idx in itertools.izip(reads, indexes):
                 read = read.strip() 
                 idx = idx.strip()
                 i += 1
-                if i == 1: #we are looking at the headers from the read and index; they must match
+                if i == 1: #we are looking at the headers from the read and index; they must match when evaulating the read
                     read_header = read
                     index_header = idx
-                elif i == 2:
+                elif i == 2: #save the UID that is on the front of the read sequence separately
                     barcode = idx
                     UidSequence = read[0: uidLen]
                     ReadSequence = read[uidLen: len(read)]
-
-                elif i == 4:
+                elif i == 4: #save the quality scores for later evaluation 
                     index_quality = idx
                     UidQuality = read[0: uidLen]
                     ReadQuality = read[uidLen: len(read)]
-            
+                    
+                    # the 4th line competes the read, assemble the pieces for the Read file record
                     reads_in_file += 1
 
                     i = 0
                     if read_header[0: read_header.index(" ")] == index_header[0: index_header.index(" ")] and len(ReadSequence) == len(ReadQuality):
                         merged_read_line = "\t".join([read_header, ReadSequence, ReadQuality, barcode, index_quality, UidSequence, UidQuality])+'\n'
 
-                        #only write the reads with barcodes for this subset of open filehandles
-                        if barcode in barcode_files:
+                        if barcode in barcode_files: # we can only write the reads with barcodes for this subset of open filehandles
                             barcode_files[barcode].write(merged_read_line)
                             
                         if first_pass: # only count records on the first pass
@@ -376,10 +388,6 @@ def loop_pairs(parms, first_pass):
                     if total_reads % 1000000 == 0:
                         logging.info(' merged %s reads', str(total_reads))
                         print(' merged:' + str(total_reads))
-                        
-                    #temporary break for output size
-                    #if total_reads==100:
-                    #    break
                         
             reads.close()
             indexes.close()
@@ -442,7 +450,7 @@ def load_input_filenames(parms):
     return readFiles, barcodeFiles
 
 
-#Opens a file handle using the file extension to open the either
+#Opens a file handle using the file extension to open either
 #a regular text file or .gz compressed file.
 def open_file(filepath):
     logging.debug('open_file')
@@ -453,15 +461,16 @@ def open_file(filepath):
         fh = open(filepath, 'rb')
     return fh
 
- 
+
+#this will eventually be converted into the reporting process 
 def write_split_stats(parms):    
     logging.debug('write_split_stats')
     logging.info('Total Reads: %i' % total_reads)    
-    logging.info('Number of Split Barcodes files: %i' % len(barcodemap_list))    
     logging.info('Barcodes in Map file listed as Used: %i' % len(barcodes_used))    
     logging.info('Barcodes in Map file listed as Not Used: %i' % len(barcodes_not_used))
     logging.info('Reads with Barcodes in Map file but listed as Not Used: %i' % len(reads_with_bc_not_used))
     logging.info('Reads with Barcodes in NOT IN Map file: %i' % len(reads_with_bc_not_found))
+
 
 def run_sort_unique(parms):
     if skip_step('unique'):
@@ -533,6 +542,76 @@ def run_sort_unique(parms):
     print('Unique finished.')
 
  
+def run_align_uniques(parms):
+    if skip_step('align'):
+        return
+    
+    logging.info('Align Started.')
+    print('Align Started.')
+
+    current_file = 0
+    workers=[]
+
+    while True:
+        #check for workers that just finished.
+        for p in workers:
+            #exitcode is None if worker still running
+            if p.exitcode is None:
+                continue
+            elif p.exitcode == 0:
+                #Worker finished successfully, checkpoint the step completion and remove the worker
+                record_checkpoint('align', p.name )
+                logging.info('   Align completed for PID: %s' % str(p.pid))
+                print ('   Align completed for ' + p.name)
+                workers.remove(p)
+                break
+            else:
+                #process finished but had error
+                logging.info('Align failed for PID: %s' % str(p.pid))
+                raise Exception('Align Worker Failed')
+                 
+        #if there are still files to process 
+        if current_file < len(barcodemap_list):
+            #check to see if the read file was completed on a previous run.
+            if is_done('align', str(barcodemap_list[current_file])):
+                current_file+=1
+                continue
+            
+            #There is work to do, see if we are allowed to start another worker
+            if len(multiprocessing.active_children()) < args.workers:
+                unique_file = os.path.join(parms['resultsDir'], "unique", barcodemap_list[current_file]+'.unique')
+                #make sure the /unique directory exists in the results directory
+                align_directory = os.path.join(parms['resultsDir'], "align")
+                if not os.path.isdir(align_directory):
+                    os.makedirs(align_directory)
+                align_file = os.path.join(align_directory, barcodemap_list[current_file]+'.align')
+                #make sure the /changes directory exists in the results directory
+                change_directory = os.path.join(parms['resultsDir'], "changes")
+                if not os.path.isdir(change_directory):
+                    os.makedirs(change_directory)
+                change_file = os.path.join(change_directory, barcodemap_list[current_file]+'.changes')
+                
+                primerset_file = os.path.join(args.directory, 'Primers.txt')                 
+                
+                align_args = Namespace(input=unique_file, output=align_file, changes=change_file, primerset=primerset_file)
+               
+                p = multiprocessing.Process(target=align.perform_align, name=barcodemap_list[current_file], args=(align_args,))
+                p.start()
+                logging.info('   Running align for %s in PID: %s' %(unique_file, str(p.pid)))
+                print('   Running align for ' + unique_file)
+                workers.append(p)
+                current_file+=1
+        
+        #if we are finished all files, stop
+        if current_file == len(barcodemap_list) and len(workers) == 0:
+            break
+        else: 
+            time.sleep(1)    
+    
+    logging.info('Align finished.')
+    print('Align finished.')
+
+ 
 def main():
     try :
         get_args()
@@ -562,7 +641,13 @@ def main():
         #split the merged inputs into separate files for each barcode
         split_inputs(parms)
         
+        #compress the reads within a given barcode into just the unique read sequences, 
+        #count well families during compression. Identify primer associated with the 
+        #unique read sequence.
         run_sort_unique(parms)
+        
+        #Use primer info to determine where changes exist in the read sequence
+        run_align_uniques(parms)
              
         logging.info('PROCESSING COMPLETE')
         print 'PROCESSING COMPLETE'

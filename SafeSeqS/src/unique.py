@@ -77,7 +77,7 @@ def perform_unique(args):
             counter += 1
             split_line = line.split('\t')
             #compress the read to use it as key for dictionary
-            key = zlib.compress(split_line[1],9) 
+            key = zlib.compress (split_line[1].encode('utf-8'),9) 
             if key not in unique_dict:
                 #if this is the first we have seen of this read, create a dictionary entry to hold all of its families
                 unique_dict[key] = {}
@@ -98,7 +98,7 @@ def perform_unique(args):
         debug_family_cnt = 0
         for key in unique_dict:
             unique_id += 1
-            read = zlib.decompress(key)
+            read = zlib.decompress(key).decode("utf-8") 
             read_count = 0
             for uid in unique_dict[key]:
                 debug_family_cnt += 1
@@ -118,7 +118,9 @@ def perform_unique(args):
                 primer = p.ampMatchName
                 #if there is a perfect match for the read1, look for the read2 AFTER read1
                 r2_primer_pos = read[len(p.read1):len(read)].find(p.read2)
-                if r2_primer_pos != -1:
+                if r2_primer_pos == -1: # read2 was not found, reset position
+                    r2_primer_pos = 0
+                else: #read2 was found
                     r2_match_type = 'Perfect Match'
                     r2_primer_pos = r2_primer_pos + len(p.read1) + 1 #add length of Read1, increment python string counter by one to reflect actual position of read2
 

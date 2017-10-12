@@ -5,7 +5,9 @@ import io
 import itertools
 import time
 import json
-import sys, traceback, os
+import sys
+import traceback
+import os
 import multiprocessing
 import platform
 import logging
@@ -79,23 +81,23 @@ def getSAFESEQSParams():
         parms = json.load(json_file)
 
     if 'reads_pattern' not in parms:
-        print 'Missing reads_pattern from JSON file'
+        print('Missing reads_pattern from JSON file')
         missing_parms =True
 
     if 'barcodes_pattern' not in parms:
-        print 'Missing barcodes_pattern from JSON file'
+        print('Missing barcodes_pattern from JSON file')
         missing_parms =True
 
     if 'reads_files' not in parms:
-        print 'Missing reads_files from JSON file'
+        print('Missing reads_files from JSON file')
         missing_parms =True
 
     if 'barcodes_files' not in parms:
-        print 'Missing barcodes_files from JSON file'
+        print('Missing barcodes_files from JSON file')
         missing_parms =True
          
     if 'barcodemap' not in parms:
-        print 'Missing barcodemap from JSON file'
+        print('Missing barcodemap from JSON file')
         missing_parms =True
          
     settings_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.path.pardir, 'data', args.settings) 
@@ -105,7 +107,7 @@ def getSAFESEQSParams():
     parms.update(settings)
     
     if 'uidLength' not in parms:
-        print 'Missing uidLength from Settings file'
+        print('Missing uidLength from Settings file')
         missing_parms =True
 
     if 'load_bad_bc' not in settings:
@@ -298,7 +300,7 @@ def load_barcodes(parms):
     if parms['save_merge']:
         barcodemap_list.append('merge')
     
-    barcodemap_file = file(os.path.join(args.directory, parms['barcodemap']),'r')
+    barcodemap_file = open(os.path.join(args.directory, parms['barcodemap']),'r')
     for line in barcodemap_file:
         line=line.rstrip('\r\n')
         split_line = line.split('\t')
@@ -324,7 +326,7 @@ def open_barcode_files(parms, start):
     logging.info('Open Files Batch from %i to %i.' % (start, (end-1)))
         
     for barcode in barcodemap_list[start:end]:
-        barcode_files[barcode] = file(os.path.join(parms['resultsDir'], "split", barcode + '.reads'),'w')
+        barcode_files[barcode] = open(os.path.join(parms['resultsDir'], "split", barcode + '.reads'),'w')
  
 
 #For each set of fastq reads and barcodes, merge the reads.      
@@ -353,7 +355,7 @@ def loop_pairs(parms, first_pass):
             #Reads have four lines in each file. As each line is read collect the pertinent info.
             #As a line is read from the fastq reads file, the corresponding 
             #index is read.
-            for read, idx in itertools.izip(reads, indexes):
+            for read, idx in itertools.zip_longest(reads, indexes):
                 read = read.strip() 
                 idx = idx.strip()
                 i += 1
@@ -373,7 +375,8 @@ def loop_pairs(parms, first_pass):
                     reads_in_file += 1
 
                     i = 0
-                    if read_header[0: read_header.index(" ")] == index_header[0: index_header.index(" ")] and len(ReadSequence) == len(ReadQuality):
+
+                    if read_header[0: read_header.find(" ")] == index_header[0: index_header.find(" ")] and len(ReadSequence) == len(ReadQuality):
                         merged_read_line = "\t".join([read_header, ReadSequence, ReadQuality, barcode, index_quality, UidSequence, UidQuality])+'\n'
 
                         if barcode in barcode_files: # we can only write the reads with barcodes for this subset of open filehandles
@@ -468,7 +471,7 @@ def open_file(filepath):
     if filepath.endswith(".gz"):
         fh = io.BufferedReader(gzip.GzipFile(filepath, "r"))
     else:
-        fh = open(filepath, 'rb')
+        fh = open(filepath, 'r')
     return fh
 
 
@@ -502,7 +505,7 @@ def run_sort_unique(parms):
                 #Worker finished successfully, checkpoint the step completion and remove the worker
                 record_checkpoint('unique', p.name )
                 logging.info('   Unique completed for PID: %s' % str(p.pid))
-                print ('   Unique completed for ' + p.name)
+                print('   Unique completed for ' + p.name)
                 workers.remove(p)
                 break
             else:
@@ -572,7 +575,7 @@ def run_align_uniques(parms):
                 #Worker finished successfully, checkpoint the step completion and remove the worker
                 record_checkpoint('align', p.name )
                 logging.info('   Align completed for PID: %s' % str(p.pid))
-                print ('   Align completed for ' + p.name)
+                print('   Align completed for ' + p.name)
                 workers.remove(p)
                 break
             else:
@@ -660,7 +663,7 @@ def main():
         run_align_uniques(parms)
              
         logging.info('PROCESSING COMPLETE')
-        print 'PROCESSING COMPLETE'
+        print('PROCESSING COMPLETE')
     except StopStep as err:
         sys.exit(0)
     except Exception as err:

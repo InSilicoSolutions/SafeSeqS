@@ -20,6 +20,9 @@ def load_primers(filename):
         #For each line, create a data record with the value of the line (tab separated)
         p = PrimerRecord(*line.strip().split('\t'))
         
+        #ensure read1 sequence is UPPER case
+        temp_read1 = p.read1.upper()
+        
         #we will need the reverse compliment of the read2 sequence
         temp_read2 = reverse_compliment(p.read2)
 
@@ -36,7 +39,7 @@ def load_primers(filename):
             temp_ampSeq = reverse_compliment(p.ampSeq[len(p.read1):(len(p.read1) + int(p.target_len))].upper())
 
         #replace the originals with the revised values
-        p = p._replace(read2 = temp_read2, testSeq_start = temp_seq_start, ampSeq = temp_ampSeq)
+        p = p._replace(read1 = temp_read1, read2 = temp_read2, testSeq_start = temp_seq_start, ampSeq = temp_ampSeq)
 
         #Put the record in the dictionary - In this case the primer name is in the record and is the dictionary key. 
         primer_dict[p.ampMatchName] = p

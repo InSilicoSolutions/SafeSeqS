@@ -109,6 +109,39 @@ def getSAFESEQSParams():
     if 'uidLength' not in parms:
         print('Missing uidLength from Settings file')
         missing_parms =True
+        
+    if 'max_mismatches_for_used_reads' not in parms:
+        print('Missing max_mismatches_for_used_reads from Settings file')
+        missing_parms =True
+        
+    if 'max_indels_for_used_reads' not in parms:
+        print('Missing max_indels_for_used_reads from Settings file')
+        missing_parms =True
+
+    if 'use_UIDs_with_Ns' not in settings:
+        parms['use_UIDs_with_Ns'] = False
+    else:
+        parms['use_UIDs_with_Ns'] = parms['use_UIDs_with_Ns'].lower()
+        if parms['use_UIDs_with_Ns'] == "yes" or parms['use_UIDs_with_Ns'] == "y":
+            parms['use_UIDs_with_Ns'] = True
+        else:
+            parms['use_UIDs_with_Ns'] = False       
+
+    if 'max_amp_per_UID_family' not in parms:
+        print('Missing max_amp_per_UID_family from Settings file')
+        missing_parms =True
+
+    if 'min_good_reads_usable_family' not in parms:
+        print('Missing min_good_reads_usable_family from Settings file')
+        missing_parms =True
+
+    if 'min_perc_good_reads_per_UID_family' not in parms:
+        print('Missing min_perc_good_reads_per_UID_family from Settings file')
+        missing_parms =True
+
+    if 'super_mut_perc_homegeneity' not in parms:
+        print('Missing super_mut_perc_homegeneity from Settings file')
+        missing_parms =True
 
     if 'load_bad_bc' not in settings:
         parms['load_bad_bc'] = False
@@ -118,8 +151,7 @@ def getSAFESEQSParams():
             parms['load_bad_bc'] = True
         else:
             parms['load_bad_bc'] = False
-        
-            
+                    
     if 'load_not_used_bc' not in settings:
         parms['load_not_used_bc'] = False
     else:
@@ -304,13 +336,19 @@ def load_barcodes(parms):
     for line in barcodemap_file:
         line=line.rstrip('\r\n')
         split_line = line.split('\t')
-        if split_line[3] == 'Not Used':
-            barcodes_not_used.append(split_line[1])
-            if parms['load_not_used_bc']:
+        #only use barcodes that have specific nucleotide characters. This will also exclude any header line.
+        for c in split_line[1]:
+            if c not in "ACGT":
+                break
+        #this else goes with the for loop. If no character exceptions are found in the barcode, continue verifying it.    
+        else:
+            if split_line[3] == 'Not Used':
+                barcodes_not_used.append(split_line[1])
+                if parms['load_not_used_bc']:
+                    barcodemap_list.append(split_line[1])
+            else:
+                barcodes_used.append(split_line[1])
                 barcodemap_list.append(split_line[1])
-        elif split_line[3] != 'Template': #don't load header line
-            barcodes_used.append(split_line[1])
-            barcodemap_list.append(split_line[1])
                         
     barcodemap_file.close()
 
@@ -363,9 +401,9 @@ def loop_pairs(parms, first_pass):
                     read_header = read
                     index_header = idx
                 elif i == 2: #save the UID that is on the front of the read sequence separately
-                    barcode = idx
-                    UidSequence = read[0: uidLen]
-                    ReadSequence = read[uidLen: len(read)]
+                    barcode = idx.upper()
+                    UidSequence = read[0: uidLen].upper()
+                    ReadSequence = read[uidLen: len(read)].upper()
                 elif i == 4: #save the quality scores for later evaluation 
                     index_quality = idx
                     UidQuality = read[0: uidLen]
@@ -469,7 +507,7 @@ def open_file(filepath):
     logging.debug('open_file')
 
     if filepath.endswith(".gz"):
-        fh = io.BufferedReader(gzip.GzipFile(filepath, "r"))
+        fh = gzip.open(filepath, "rt")
     else:
         fh = open(filepath, 'r')
     return fh
@@ -593,7 +631,8 @@ def run_align_uniques(parms):
             #There is work to do, see if we are allowed to start another worker
             if len(multiprocessing.active_children()) < args.workers:
                 unique_file = os.path.join(parms['resultsDir'], "unique", barcodemap_list[current_file]+'.unique')
-                #make sure the /unique directory exists in the results directory
+                wf_file = os.path.join(parms['resultsDir'], "family", barcodemap_list[current_file]+'.family')
+                #make sure the /align directory exists in the results directory
                 align_directory = os.path.join(parms['resultsDir'], "align")
                 if not os.path.isdir(align_directory):
                     os.makedirs(align_directory)
@@ -603,11 +642,22 @@ def run_align_uniques(parms):
                 if not os.path.isdir(change_directory):
                     os.makedirs(change_directory)
                 change_file = os.path.join(change_directory, barcodemap_list[current_file]+'.changes')
+                #make sure the /UIDstats directory exists in the results directory
+                us_directory = os.path.join(parms['resultsDir'], "UIDstats")
+                if not os.path.isdir(us_directory):
+                    os.makedirs(us_directory)
+                us_file = os.path.join(us_directory, barcodemap_list[current_file]+'.UIDstats')
                 
                 primerset_file = os.path.join(args.directory, 'Primers.txt')                 
                 
-                align_args = Namespace(input=unique_file, output=align_file, changes=change_file, primerset=primerset_file)
-               
+                align_args = Namespace(input=unique_file, output=align_file, changes=change_file, wellfamilies=wf_file, UIDstats=us_file,
+                                       primerset=primerset_file,
+                                       max_mismatches_allowed = parms['max_mismatches_for_used_reads'],
+                                       max_indels_allowed = parms['max_indels_for_used_reads'],
+                                       min_good_reads = parms['min_good_reads_usable_family'],
+                                       min_frac_good_reads = parms['min_perc_good_reads_per_UID_family'],
+                                       use_UIDs_with_Ns = parms['use_UIDs_with_Ns'])
+                              
                 p = multiprocessing.Process(target=align.perform_align, name=barcodemap_list[current_file], args=(align_args,))
                 p.start()
                 logging.info('   Running align for %s in PID: %s' %(unique_file, str(p.pid)))

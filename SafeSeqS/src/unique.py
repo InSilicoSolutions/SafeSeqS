@@ -99,15 +99,10 @@ def perform_unique(args):
         for key in unique_dict:
             unique_id += 1
             read = zlib.decompress(key).decode("utf-8") 
-            read_count = 0
-            for uid in unique_dict[key]:
-                debug_family_cnt += 1
-                family_fh.write('\t'.join([str(unique_id), read, barcode, uid, str(unique_dict[key][uid])]) + '\n') 
-                #count for this read will be sum of all family counts within it 
-                read_count = read_count + unique_dict[key][uid]
-                
+            #look for primer match for this unique read sequence (well family will hold primer for UIDstats)
             # initialize file output for No Match scenario
             primer = 'No Match'
+            perfect_primer = 'No Match'
             r1_match_type = 'No Match'
             r2_match_type = 'No Match'
             r1_primer_pos = 0
@@ -124,6 +119,14 @@ def perform_unique(args):
                     r2_match_type = 'Perfect Match'
                     r2_primer_pos = r2_primer_pos + len(p.read1) + 1 #add length of Read1, increment python string counter by one to reflect actual position of read2
 
+            #loop through the UIDs for this read sequence to get well families, and sum total read count            
+            read_count = 0
+            for uid in unique_dict[key]:
+                debug_family_cnt += 1
+                family_fh.write('\t'.join([str(unique_id), read, barcode, uid, str(unique_dict[key][uid])]) + '\n') 
+                #count for this read will be sum of all family counts within it 
+                read_count = read_count + unique_dict[key][uid]
+                
             output_fh.write('\t'.join([str(unique_id), read, str(read_count), primer, r1_match_type, str(r1_primer_pos), r2_match_type , str(r2_primer_pos)]) + '\n')
  
         output_fh.close()

@@ -84,6 +84,8 @@ def get_log_dir(output):
 def perform_align(args):
     global primer_dict
     global good_reads
+    cosmics = {}
+    snps = {}
     
     args.max_mismatches_allowed = int(args.max_mismatches_allowed)
     args.max_indels_allowed = int(args.max_indels_allowed)
@@ -115,6 +117,8 @@ def perform_align(args):
              
             test_seq = 'NULL'
             mismatch_cnt = 0
+            snp_cnt = 0
+            cosmic_cnt = 0
             indel_cnt = 0
             ins_bases = 0
             del_bases = 0            
@@ -131,8 +135,6 @@ def perform_align(args):
                     test_seq = utilities.reverse_compliment(u.read_seq[len(p.read1):int(u.read2_pos) - 1].upper())
 
                 #if the test sequence matches the target amplicon sequence, we have a perfect match. Simply write the alignment record with no changes.  
-                snp_cnt = 0
-                cosmic_cnt = 0
                 if test_seq != p.ampSeq:
                 #if there is a mismatch, insertions or deletions (indels) and/or Single Base Substitutions (SBS) exist, finda and record the changes      
                     pos = -1 #initialize the indel loop counter to -1 so that if there is no indel, SBS mismatch check won't think it was position 0
@@ -145,7 +147,7 @@ def perform_align(args):
                         pos, BaseFrom, BaseTo, test_seq = get_indel(p.ampSeq, test_seq)
                         if indel_len > 0: #insertion
                             ins_bases = indel_len
-                            chrom_pos = int(p.testSeq_start) + pos - 1
+                            chrom_pos = int(p.hg19_start) + pos - 1
 
                             if p.readStrand == '+': 
                                 cycle = int(u.read1_pos) + len(p.read1) + pos
@@ -154,7 +156,7 @@ def perform_align(args):
                             
                         else:
                             del_bases = indel_len #deletion
-                            chrom_pos = int(p.testSeq_start) + pos
+                            chrom_pos = int(p.hg19_start) + pos
 
                             if p.readStrand == '+':
                                 cycle = int(u.read1_pos) + len(p.read1) + pos - 1
@@ -163,13 +165,14 @@ def perform_align(args):
 
                         changes_fh.write('\t'.join([u.seqUID, p.chrom, str(chrom_pos), "Indel", BaseFrom, BaseTo, str(cycle)]) + '\n')
 
-                    mismatch_cnt = 0
-
                     #look for any SBS mismatches
                     #the indel logic will have adjusted for any length mismatch    
                     for i in range(0, len(p.ampSeq)):
                         if p.ampSeq[i] != test_seq[i] and test_seq[i] != "N":
-                            chrom_pos = int(p.testSeq_start) + i
+                            chrom_pos = int(p.hg19_start) + i
+                            cosmic_fnd = ''
+                            snp_fnd = ''
+
                             #cycle is exact position of the SBS on original read sequence, we will need it to evaluate the read quality score later
                             #if there was an indel, adjust for its length
                             if p.readStrand == '+':
@@ -180,9 +183,32 @@ def perform_align(args):
                                 cycle = int(u.read2_pos) - i - 1 
                                 if i > pos:
                                     cycle = cycle - indel_len #adjust by +/- length of indel
-
+                        
                             #check for COSMIC, then SNP
-                            changes_fh.write('\t'.join([u.seqUID, p.chrom, str(chrom_pos), 'SBS', p.ampSeq[i], test_seq[i], str(cycle)]) + '\n')
+                            if not cosmics:
+                                #load cosmics into dictionary
+                                cosmics = utilities.load_references(args.output, 'COSMIC')
+
+                            if p.chrom in cosmics:
+                                for r in cosmics[p.chrom]: #go through each entry with COSMICS on this chrom
+                                    if str(chrom_pos) == r.position and p.ampSeq[i] == r.baseFrom and test_seq[i] == r.baseTo:
+                                        cosmic_fnd = r.value
+                                        cosmic_cnt += 1
+                                        break
+                            #if no COSMIC, then check for SNP
+                            if cosmic_fnd == '':
+                                if not snps:
+                                    #load snps into dictionary
+                                    snps = utilities.load_references(args.output, 'SNP')
+    
+                                if p.chrom in snps:
+                                    for r in snps[p.chrom]: #go through each entry with SNPs on this chrom
+                                        if str(chrom_pos) == r.position and p.ampSeq[i] == r.baseFrom and test_seq[i] == r.baseTo:
+                                            snp_fnd = r.value
+                                            snp_cnt += 1
+                                            break
+                                    
+                            changes_fh.write('\t'.join([u.seqUID, p.chrom, str(chrom_pos), 'SBS', p.ampSeq[i], test_seq[i], str(cycle), snp_fnd, cosmic_fnd]) + '\n')
                             #increment number of mismatches found in this sequence alignment record
                             mismatch_cnt +=1
                 
@@ -294,6 +320,7 @@ def calculate_uid_stats(args):
         family_diversity = 0
         primers = []
         amplicon = ''
+        usable = 0
         
         for seqUID in UIDs[uid]:
             family_diversity += 1
@@ -305,14 +332,14 @@ def calculate_uid_stats(args):
                     primers.append(good_reads[seqUID])
 
         amplicon_diversity = len(primers)
+        if amplicon_diversity == 1:
+            amplicon = primers[0]
+
 
         if uid.find("N") > -1 and args.use_UIDs_with_Ns == 'N': #if the UID had an N AND the flag says skip Ns, don't use this one
-            usable = 0
-        elif amplicon_diversity == 1 and family_good_cnt >= args.min_good_reads and (family_good_cnt/family_cnt) > args.min_frac_good_reads:
-            amplicon = primers[0]
+            continue
+        elif family_good_cnt >= args.min_good_reads and (family_good_cnt/family_cnt) > args.min_frac_good_reads:
             usable = 1
-        else:
-            usable = 0
         
         us_fh.write('\t'.join([barcode, uid, str(family_cnt), str(family_diversity), str(family_good_cnt), str(amplicon_diversity), amplicon, str(usable)]) + '\n')
  

@@ -12,6 +12,7 @@ import multiprocessing
 import platform
 import logging
 
+import utilities
 import unique
 import align
 
@@ -532,6 +533,15 @@ def run_sort_unique(parms):
 
     current_file = 0
     workers=[]
+    #make sure the /unique directory exists in the results directory
+    unique_directory = os.path.join(parms['resultsDir'], "unique")
+    if not os.path.isdir(unique_directory):
+        os.makedirs(unique_directory)
+    #make sure the /family directory exists in the results directory
+    family_directory = os.path.join(parms['resultsDir'], "family")
+    if not os.path.isdir(family_directory):
+        os.makedirs(family_directory)
+
 
     while True:
         #check for workers that just finished.
@@ -561,17 +571,8 @@ def run_sort_unique(parms):
             #There is work to do, see if we are allowed to start another worker
             if len(multiprocessing.active_children()) < args.workers:
                 read = os.path.join(parms['resultsDir'], "split", barcodemap_list[current_file]+'.reads')
-                #make sure the /unique directory exists in the results directory
-                unique_directory = os.path.join(parms['resultsDir'], "unique")
-                if not os.path.isdir(unique_directory):
-                    os.makedirs(unique_directory)
                 result_file = os.path.join(unique_directory, barcodemap_list[current_file]+'.unique')
-                #make sure the /family directory exists in the results directory
-                family_directory = os.path.join(parms['resultsDir'], "family")
-                if not os.path.isdir(family_directory):
-                    os.makedirs(family_directory)
                 family_file = os.path.join(family_directory, barcodemap_list[current_file]+'.family')
-                
                 primerset_file = os.path.join(args.directory, 'Primers.txt')                 
                 
                 unique_args = Namespace(input=read, output=result_file, family=family_file, primerset=primerset_file)
@@ -599,6 +600,31 @@ def run_align_uniques(parms):
     
     logging.info('Align Started.')
     print('Align Started.')
+    
+    #make sure the /align directory exists in the results directory
+    align_directory = os.path.join(parms['resultsDir'], "align")
+    if not os.path.isdir(align_directory):
+        os.makedirs(align_directory)
+    #make sure the /changes directory exists in the results directory
+    change_directory = os.path.join(parms['resultsDir'], "changes")
+    if not os.path.isdir(change_directory):
+        os.makedirs(change_directory)
+    #make sure the /UIDstats directory exists in the results directory
+    us_directory = os.path.join(parms['resultsDir'], "UIDstats")
+    if not os.path.isdir(us_directory):
+        os.makedirs(us_directory)
+
+    #load a subset of COSMICs for the run, using the runs's primer set to focus on specific positions for specific chromosomes               
+    primerset_file = os.path.join(args.directory, 'Primers.txt')
+    data_input = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.path.pardir, 'data', "COSMIC.txt")
+    subset = os.path.join(parms['resultsDir'], "COSMIC.txt")              
+    utilities.condense_ref_data(primerset_file, data_input, subset)
+    #load a subset of SNPs for the run, using the run's primer set to focus on specific positions for specific chromosomes               
+    primerset_file = os.path.join(args.directory, 'Primers.txt')
+    data_input = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.path.pardir, 'data', "SNP.txt")
+    subset = os.path.join(parms['resultsDir'], "SNP.txt")              
+    utilities.condense_ref_data(primerset_file, data_input, subset)
+    
 
     current_file = 0
     workers=[]
@@ -632,23 +658,9 @@ def run_align_uniques(parms):
             if len(multiprocessing.active_children()) < args.workers:
                 unique_file = os.path.join(parms['resultsDir'], "unique", barcodemap_list[current_file]+'.unique')
                 wf_file = os.path.join(parms['resultsDir'], "family", barcodemap_list[current_file]+'.family')
-                #make sure the /align directory exists in the results directory
-                align_directory = os.path.join(parms['resultsDir'], "align")
-                if not os.path.isdir(align_directory):
-                    os.makedirs(align_directory)
                 align_file = os.path.join(align_directory, barcodemap_list[current_file]+'.align')
-                #make sure the /changes directory exists in the results directory
-                change_directory = os.path.join(parms['resultsDir'], "changes")
-                if not os.path.isdir(change_directory):
-                    os.makedirs(change_directory)
                 change_file = os.path.join(change_directory, barcodemap_list[current_file]+'.changes')
-                #make sure the /UIDstats directory exists in the results directory
-                us_directory = os.path.join(parms['resultsDir'], "UIDstats")
-                if not os.path.isdir(us_directory):
-                    os.makedirs(us_directory)
                 us_file = os.path.join(us_directory, barcodemap_list[current_file]+'.UIDstats')
-                
-                primerset_file = os.path.join(args.directory, 'Primers.txt')                 
                 
                 align_args = Namespace(input=unique_file, output=align_file, changes=change_file, wellfamilies=wf_file, UIDstats=us_file,
                                        primerset=primerset_file,

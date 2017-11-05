@@ -43,7 +43,7 @@ import utilities
 UniqueSeqRecord = namedtuple('UniqueSeqRecord', ['seqUID', 'read_seq', 'read_cnt', 'primerMatch', 'read1_match', 'read1_pos', 'read2_match', 'read2_pos'])
 
 #define the Well Family input data record for easier reference
-WellFamilyRecord = namedtuple('WellFamilyRecord', ['seqUID', 'read_seq', 'barcode', 'uid', 'read_cnt'])
+WellFamilyRecord = namedtuple('WellFamilyRecord', ['seqUID', 'read_seq', 'barcode', 'uid', 'read_cnt', 'primer'])
 
 #create a global dictionary to store primers form the primer file
 primer_dict = {}
@@ -170,8 +170,8 @@ def perform_align(args):
                     for i in range(0, len(p.ampSeq)):
                         if p.ampSeq[i] != test_seq[i] and test_seq[i] != "N":
                             chrom_pos = int(p.hg19_start) + i
-                            cosmic_fnd = ''
-                            snp_fnd = ''
+                            cosmic_fnd = '0'
+                            snp_fnd = 'NULL'
 
                             #cycle is exact position of the SBS on original read sequence, we will need it to evaluate the read quality score later
                             #if there was an indel, adjust for its length
@@ -196,7 +196,7 @@ def perform_align(args):
                                         cosmic_cnt += 1
                                         break
                             #if no COSMIC, then check for SNP
-                            if cosmic_fnd == '':
+                            if cosmic_fnd == '0':
                                 if not snps:
                                     #load snps into dictionary
                                     snps = utilities.load_references(args.output, 'SNP')
@@ -217,8 +217,8 @@ def perform_align(args):
 
                 #determine if this unique read sequence meets the settings for a Good Read
                 if corrected_mismatch_cnt <= args.max_mismatches_allowed and indel_cnt <= args.max_indels_allowed:
-                    #save this ID and it's primer for building UIDstats later
-                    good_reads[u.seqUID] = p.ampMatchName
+                    #save this ID for building UIDstats later
+                    good_reads[u.seqUID] = 'y'
                         
         input_fh.close()
         output_fh.close()
@@ -291,12 +291,12 @@ def compare_sequences(reference, test):
     return score
 
 def calculate_uid_stats(args):
-    #first create a dictionary of UIDs from Well Family File with each seqUID and count.
-    #this will organize and sort them from the Well Family file
+    #first create a dictionary of UIDs from Well Family Reads File with each seqUID and count.
+    #this will organize and sort them from the Well Family Reads file
     UIDs = {}
 
     input_fh = open(args.wellfamilies,'r')
-    #read through well families, creating a dictionary of UIDs with their seqUIds(ids for unique read sequences) and read counts
+    #read through well families, creating a dictionary of UIDs with their seqUIds(ids for unique read sequences), read counts, and primer
     for line in input_fh:
         #For each line, create a data record with the value of the line (tab separated)
         w = WellFamilyRecord(*line.strip().split('\t'))
@@ -305,9 +305,9 @@ def calculate_uid_stats(args):
             #if this is the first we have seen of this UID, create a dictionary entry to hold all of its seqUIds
             UIDs[w.uid] = {}
 
-        #store the read count for the read sequence
+        #store the read count and primer for the read sequence
         if w.seqUID not in UIDs[w.uid]:
-            UIDs[w.uid][w.seqUID] = int(w.read_cnt)
+            UIDs[w.uid][w.seqUID] = (int(w.read_cnt), w.primer)
 
     input_fh.close()  
 
@@ -324,12 +324,13 @@ def calculate_uid_stats(args):
         
         for seqUID in UIDs[uid]:
             family_diversity += 1
-            family_cnt = family_cnt + UIDs[uid][seqUID]
+            family_cnt = family_cnt + UIDs[uid][seqUID][0]
             
             if seqUID in good_reads:
-                family_good_cnt = family_good_cnt + UIDs[uid][seqUID]
-                if good_reads[seqUID] not in primers:
-                    primers.append(good_reads[seqUID])
+                family_good_cnt = family_good_cnt + UIDs[uid][seqUID][0]
+
+            if UIDs[uid][seqUID][1] != "No Match" and UIDs[uid][seqUID][1] not in primers:
+                primers.append(UIDs[uid][seqUID][1])
 
         amplicon_diversity = len(primers)
         if amplicon_diversity == 1:

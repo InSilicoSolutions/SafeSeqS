@@ -95,14 +95,12 @@ def perform_unique(args):
         logging.debug('total reads: %s', str(counter))
 
         unique_id = 0 # begin a unique counter to use as identifier for the unique read
-        debug_family_cnt = 0
         for key in unique_dict:
             unique_id += 1
             read = zlib.decompress(key).decode("utf-8") 
             #look for primer match for this unique read sequence (well family will hold primer for UIDstats)
             # initialize file output for No Match scenario
             primer = 'No Match'
-            perfect_primer = 'No Match'
             r1_match_type = 'No Match'
             r2_match_type = 'No Match'
             r1_primer_pos = 0
@@ -122,17 +120,13 @@ def perform_unique(args):
             #loop through the UIDs for this read sequence to get well families, and sum total read count            
             read_count = 0
             for uid in unique_dict[key]:
-                debug_family_cnt += 1
-                family_fh.write('\t'.join([str(unique_id), read, barcode, uid, str(unique_dict[key][uid])]) + '\n') 
+                family_fh.write('\t'.join([str(unique_id), read, barcode, uid, str(unique_dict[key][uid]), primer]) + '\n') 
                 #count for this read will be sum of all family counts within it 
                 read_count = read_count + unique_dict[key][uid]
                 
             output_fh.write('\t'.join([str(unique_id), read, str(read_count), primer, r1_match_type, str(r1_primer_pos), r2_match_type , str(r2_primer_pos)]) + '\n')
  
         output_fh.close()
-        
-        logging.debug('unique reads: %s', str(unique_id))
-        logging.debug('families: %s', str(debug_family_cnt))
         
         logging.info('UNIQUE PROCESSING COMPLETED for %s', args.input)
         return

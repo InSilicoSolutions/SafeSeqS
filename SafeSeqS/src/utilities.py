@@ -56,7 +56,7 @@ def load_primers(filename):
 def condense_ref_data(primer_file, db_file, subset_file):
     #load a dictionary of chromosomes along with a list of start and end positions used by the primers for the study
     chromRefs = load_chrom_pos(primer_file)
-
+    
     #write subset of reference data
     refDB_fh = open(db_file,'r')
     refSubset_fh = open(subset_file,'w')
@@ -101,24 +101,30 @@ def load_chrom_pos(filename):
     return chromRefs
 
 
-def load_references(filename, type):
+def load_references(filename, ref_type):
     references = {}
-    
-    #extract the study directory from the filename, look for the COSMIC subset file there
-    input_fh = open(os.path.join(os.path.dirname(filename), os.path.pardir, type + ".txt"),'r')
-    
-    for line in input_fh:
-        #For each line, create a data record with the value of the line (tab separated)
-        r = ReferenceRecord(*line.strip().split('\t'))
-        #Store the reference record (SNP or COSMIC) in the dictionary.
-        if r.chrom in references:
-            references[r.chrom].append((r))
-        else:
-            references[r.chrom] = [r]
-                     
-    input_fh.close()
-    
+
+    if os.path.isfile(filename):
+        
+        #extract the study directory from the filename, look for the COSMIC subset file there
+        input_fh = open(os.path.join(os.path.dirname(filename), os.path.pardir, ref_type + ".txt"),'r')
+        
+        for line in input_fh:
+            #For each line, create a data record with the value of the line (tab separated)
+            r = ReferenceRecord(*line.strip().split('\t'))
+            #Store the reference record (SNP or COSMIC) in the dictionary.
+            if r.chrom in references:
+                references[r.chrom].append((r))
+            else:
+                references[r.chrom] = [r]
+                         
+        input_fh.close()
+    else:
+        references['empty'] = True
+        
     return references
+
+
 #reverse the order of the string and substitute the opposite nucleotide
 def reverse_compliment(string):
 

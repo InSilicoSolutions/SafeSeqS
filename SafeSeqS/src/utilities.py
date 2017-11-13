@@ -8,12 +8,29 @@ import os
 #            ReadStrand, Hg19Start, Hg19End
 #
 
-#define the primer data record
+#define common data records for easier reference
 PrimerRecord = namedtuple('PrimerRecord', ['ampMatchName', 'gene', 'read1', 'read2', 'ampSeq', 'target_len', 'chrom', 'readStrand', 'hg19_start', 'hg19_end'])
-#define the chromosome reference data record
 ChromRefRecord = namedtuple('ChromRefRecord', ['chrom', 'hg19_start', 'hg19_end'])
-#define the reference data record - same format for Cosmics and SNPs
 ReferenceRecord = namedtuple('ReferenceRecord', ['chrom', 'position', 'baseFrom', 'baseTo', 'value'])
+ReadRecord = namedtuple('ReadRecord', ['read_hdr', 'read_seq', 'read_qual', 'barcode', 'bc_quality', 'uid', 'uid_qual'])
+UniqueSeqRecord = namedtuple('UniqueSeqRecord', ['seqUID', 'read_seq', 'read_cnt', 'primerMatch', 'read1_match', 'read1_pos', 'read2_match', 'read2_pos'])
+WellFamilyRecord = namedtuple('WellFamilyRecord', ['seqUID', 'read_seq', 'barcode', 'uid', 'read_cnt', 'primer'])
+UidStatsRecord = namedtuple('UidStatsRecord', ['barcode', 'uid', 'family_cnt', 'family_diversity','family_good_cnt', 'amplicon_diversity', 'primer', 'usable'])
+AlignRecord = namedtuple('AlignRecord', ['seqUID', 'read_seq', 'read_cnt','primer', 'test_seq', 'read1', 'read1_pos', 'read2', 'read2_pos',
+                                         'indel_cnt', 'mismatch_cnt', 'ins_bases', 'del_bases', 'snp_cnt', 'cosmic_cnt', 'corr_mismatch_cnt'])
+ChangeRecord = namedtuple('ChangeRecord', ['seqUID', 'chrom', 'position', 'type', 'baseFrom', 'baseTo', 'cycle', 'snp', 'cosmic'])
+
+
+def get_log_dir(output):
+    #strip the output file from the output string to get the output directory
+    results_directory = os.path.dirname(output)
+    #add \log to make the log directory
+    log_directory = os.path.join(results_directory, os.path.pardir, "log")
+    #if the log directory does not exist, create it
+    if not os.path.isdir(log_directory):
+        os.makedirs(log_directory)
+    return log_directory
+
 
 #load primers from file into dictionary for alignment
 def load_primers(filename):
@@ -61,7 +78,7 @@ def condense_ref_data(primer_file, db_file, subset_file):
     refDB_fh = open(db_file,'r')
     refSubset_fh = open(subset_file,'w')
         
-    #write all COSMICs for chroms being used in the run whose position is within primer start and end position. 
+    #write all ref items (COSMICs or SNPs) for chroms being used in the run whose position is within primer start and end position. 
     for line in refDB_fh:
         l = line.strip().split('\t')
         #There must be a value in the SNP or Somatic Count column

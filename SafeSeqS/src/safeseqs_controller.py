@@ -15,6 +15,7 @@ import logging
 import utilities
 import unique
 import align
+import super_mutants
 
 #safeseqs_controller - This process runs the analytical steps of the SAFESEQS pipeline.
 
@@ -119,14 +120,14 @@ def getSAFESEQSParams():
         print('Missing max_indels_for_used_reads from Settings file')
         missing_parms =True
 
-    if 'use_UIDs_with_Ns' not in settings:
-        parms['use_UIDs_with_Ns'] = False
+    if 'mark_UIDs_with_Ns_UnUsable' not in settings:
+        parms['mark_UIDs_with_Ns_UnUsable'] = False
     else:
-        parms['use_UIDs_with_Ns'] = parms['use_UIDs_with_Ns'].lower()
-        if parms['use_UIDs_with_Ns'] == "yes" or parms['use_UIDs_with_Ns'] == "y":
-            parms['use_UIDs_with_Ns'] = True
+        parms['mark_UIDs_with_Ns_UnUsable'] = parms['mark_UIDs_with_Ns_UnUsable'].lower()
+        if parms['mark_UIDs_with_Ns_UnUsable'] == "yes" or parms['mark_UIDs_with_Ns_UnUsable'] == "y":
+            parms['mark_UIDs_with_Ns_UnUsable'] = True
         else:
-            parms['use_UIDs_with_Ns'] = False       
+            parms['mark_UIDs_with_Ns_UnUsable'] = False       
 
     if 'max_amp_per_UID_family' not in parms:
         print('Missing max_amp_per_UID_family from Settings file')
@@ -675,7 +676,7 @@ def run_align_uniques(parms):
                                        max_indels_allowed = parms['max_indels_for_used_reads'],
                                        min_good_reads = parms['min_good_reads_usable_family'],
                                        min_frac_good_reads = parms['min_perc_good_reads_per_UID_family'],
-                                       use_UIDs_with_Ns = parms['use_UIDs_with_Ns'])
+                                       mark_UIDs_with_Ns_UnUsable = parms['mark_UIDs_with_Ns_UnUsable'])
                               
                 p = multiprocessing.Process(target=align.perform_align, name=barcodemap_list[current_file], args=(align_args,))
                 p.start()
@@ -692,6 +693,77 @@ def run_align_uniques(parms):
     
     logging.info('Align finished.')
     print('Align finished.')
+
+ 
+def run_super_mutants(parms):
+    if skip_step('supermutant'):
+        return
+    
+    logging.info('Super Mutant Started.')
+    print('Super Mutant Started.')
+    
+    #make sure the /mutants directory exists in the results directory
+    mutant_directory = os.path.join(parms['resultsDir'], "mutants")
+    if not os.path.isdir(mutant_directory):
+        os.makedirs(mutant_directory)
+
+    current_file = 0
+    workers=[]
+
+    while True:
+        #check for workers that just finished.
+        for p in workers:
+            #exitcode is None if worker still running
+            if p.exitcode is None:
+                continue
+            elif p.exitcode == 0:
+                #Worker finished successfully, checkpoint the step completion and remove the worker
+                record_checkpoint('supermutant', p.name )
+                logging.info('   Super Mutant completed for PID: %s' % str(p.pid))
+                print('   Super Mutant completed for ' + p.name)
+                workers.remove(p)
+                break
+            else:
+                #process finished but had error
+                logging.info('Super Mutant failed for PID: %s' % str(p.pid))
+                raise Exception('Super Mutant Worker Failed')
+                 
+        #if there are still files to process 
+        if current_file < len(barcodemap_list):
+            #check to see if the read file was completed on a previous run.
+            if is_done('supermutant', str(barcodemap_list[current_file])):
+                current_file+=1
+                continue
+            
+            #There is work to do, see if we are allowed to start another worker
+            if len(multiprocessing.active_children()) < args.workers:
+                reads_file = os.path.join(parms['resultsDir'], "split", barcodemap_list[current_file]+'.reads')
+                wf_file = os.path.join(parms['resultsDir'], "family", barcodemap_list[current_file]+'.family')
+                align_file = os.path.join(parms['resultsDir'], "align", barcodemap_list[current_file]+'.align')
+                change_file = os.path.join(parms['resultsDir'], "changes", barcodemap_list[current_file]+'.changes')
+                us_file = os.path.join(parms['resultsDir'], "UIDstats", barcodemap_list[current_file]+'.UIDstats')
+                mutant_file = os.path.join(mutant_directory, barcodemap_list[current_file]+'.smt')
+                
+                mutant_args = Namespace(reads=reads_file, aligns=align_file, changes=change_file, familyReads=wf_file, uidStats=us_file,
+                                       output=mutant_file,
+                                       max_mismatches_allowed = int(parms['max_mismatches_for_used_reads']),
+                                       max_indels_allowed = int(parms['max_indels_for_used_reads']))
+                              
+                p = multiprocessing.Process(target=super_mutants.perform_sup_mut_tab, name=barcodemap_list[current_file], args=(mutant_args,))
+                p.start()
+                logging.info('   Running super mutant for %s in PID: %s' %(us_file, str(p.pid)))
+                print('   Running super mutant for ' + us_file)
+                workers.append(p)
+                current_file+=1
+        
+        #if we are finished all files, stop
+        if current_file == len(barcodemap_list) and len(workers) == 0:
+            break
+        else: 
+            time.sleep(1)    
+    
+    logging.info('Super Mutant finished.')
+    print('Super Mutant finished.')
 
  
 def main():
@@ -730,6 +802,9 @@ def main():
         
         #Use primer info to determine where changes exist in the read sequence
         run_align_uniques(parms)
+             
+        #begin tabulations to identify super mutants
+        run_super_mutants(parms)
              
         logging.info('PROCESSING COMPLETE')
         print('PROCESSING COMPLETE')

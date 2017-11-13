@@ -39,12 +39,6 @@ import utilities
 #                COSMIC
 #
 
-#define the Unique Read Sequence input data record for easier reference
-UniqueSeqRecord = namedtuple('UniqueSeqRecord', ['seqUID', 'read_seq', 'read_cnt', 'primerMatch', 'read1_match', 'read1_pos', 'read2_match', 'read2_pos'])
-
-#define the Well Family input data record for easier reference
-WellFamilyRecord = namedtuple('WellFamilyRecord', ['seqUID', 'read_seq', 'barcode', 'uid', 'read_cnt', 'primer'])
-
 #create a global dictionary to store primers form the primer file
 primer_dict = {}
 
@@ -64,21 +58,10 @@ def get_args():
     parser.add_argument('-mi', '--max_indels_allowed', help='The maximum number of indels that a read can contain and still be a good read.', required=True)
     parser.add_argument('-mg', '--min_good_reads', help='The minimum good reads a UIDfamily must contain to be usable.', required=True)
     parser.add_argument('-mf', '--min_frac_good_reads', help='The minimum percent of reads that must be good reads for a UIDfamily to be usable.', required=True)
-    parser.add_argument('-un', '--use_UIDs_with_Ns', help='flag indicating whether uids with Ns are usable.', required=True)
+    parser.add_argument('-un', '--mark_UIDs_with_Ns_UnUsable', help='flag indicating whether uids with Ns are usable.', required=True)
 
     args = parser.parse_args()
     return args    
-
-
-def get_log_dir(output):
-    #strip the output file from the output string to get the output directory
-    results_directory = os.path.dirname(output)
-    #add \log to make the log directory
-    log_directory = os.path.join(results_directory, os.path.pardir, "log")
-    #if the log directory does not exist, create it
-    if not os.path.isdir(log_directory):
-        os.makedirs(log_directory)
-    return log_directory
 
 
 def perform_align(args):
@@ -91,9 +74,8 @@ def perform_align(args):
     args.max_indels_allowed = int(args.max_indels_allowed)
     args.min_good_reads = int(args.min_good_reads)
     args.min_frac_good_reads = float(args.min_frac_good_reads)/100
-
     
-    logfile = os.path.join(get_log_dir(args.output),"Align"+ str(os.getpid()) + ".log")
+    logfile = os.path.join(utilities.get_log_dir(args.output),"Align"+ str(os.getpid()) + ".log")
     logging.basicConfig(
         format='%(asctime)s %(levelname)s: %(message)s', 
         datefmt='%m/%d/%y %I:%M:%S %p',
@@ -113,7 +95,7 @@ def perform_align(args):
         
         for line in input_fh:
             #For each line, create a data record with the value of the line (tab separated)
-            u = UniqueSeqRecord(*line.strip().split('\t'))
+            u = utilities.UniqueSeqRecord(*line.strip().split('\t'))
              
             test_seq = 'NULL'
             mismatch_cnt = 0
@@ -163,7 +145,7 @@ def perform_align(args):
                             else:
                                 cycle = int(u.read2_pos) - pos #if the primer indicates that the read is reverse, we count backwards from the beginning of read2
 
-                        changes_fh.write('\t'.join([u.seqUID, p.chrom, str(chrom_pos), "Indel", BaseFrom, BaseTo, str(cycle)]) + '\n')
+                        changes_fh.write('\t'.join([u.seqUID, p.chrom, str(chrom_pos), "Indel", BaseFrom, BaseTo, str(cycle), 'NULL', '0']) + '\n')
 
                     #look for any SBS mismatches
                     #the indel logic will have adjusted for any length mismatch    
@@ -291,7 +273,7 @@ def compare_sequences(reference, test):
     return score
 
 def calculate_uid_stats(args):
-    #first create a dictionary of UIDs from Well Family Reads File with each seqUID and count.
+    #first create a dictionary of UIDs from Well Family Reads File with each of its seqUIDs and read count.
     #this will organize and sort them from the Well Family Reads file
     UIDs = {}
 
@@ -299,7 +281,7 @@ def calculate_uid_stats(args):
     #read through well families, creating a dictionary of UIDs with their seqUIds(ids for unique read sequences), read counts, and primer
     for line in input_fh:
         #For each line, create a data record with the value of the line (tab separated)
-        w = WellFamilyRecord(*line.strip().split('\t'))
+        w = utilities.WellFamilyRecord(*line.strip().split('\t'))
         barcode = w.barcode
         if w.uid not in UIDs:
             #if this is the first we have seen of this UID, create a dictionary entry to hold all of its seqUIds
@@ -335,12 +317,10 @@ def calculate_uid_stats(args):
         amplicon_diversity = len(primers)
         if amplicon_diversity == 1:
             amplicon = primers[0]
-
-
-        if uid.find("N") > -1 and args.use_UIDs_with_Ns == 'N': #if the UID had an N AND the flag says skip Ns, don't use this one
-            continue
-        elif family_good_cnt >= args.min_good_reads and (family_good_cnt/family_cnt) > args.min_frac_good_reads:
-            usable = 1
+            if uid.find("N") > -1 and args.mark_UIDs_with_Ns_UnUsable: #if the UID had an N AND the flag says skip Ns, don't use this one
+                usable = 0
+            elif family_good_cnt >= args.min_good_reads and (family_good_cnt/family_cnt) > args.min_frac_good_reads:
+                usable = 1
         
         us_fh.write('\t'.join([barcode, uid, str(family_cnt), str(family_diversity), str(family_good_cnt), str(amplicon_diversity), amplicon, str(usable)]) + '\n')
  

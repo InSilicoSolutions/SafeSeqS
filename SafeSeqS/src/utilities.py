@@ -11,7 +11,9 @@ import os
 #define common data records for easier reference
 PrimerRecord = namedtuple('PrimerRecord', ['ampMatchName', 'gene', 'read1', 'read2', 'ampSeq', 'target_len', 'chrom', 'readStrand', 'hg19_start', 'hg19_end'])
 ChromRefRecord = namedtuple('ChromRefRecord', ['chrom', 'hg19_start', 'hg19_end'])
-ReferenceRecord = namedtuple('ReferenceRecord', ['chrom', 'position', 'baseFrom', 'baseTo', 'value'])
+#ReferenceRecord = namedtuple('ReferenceRecord', ['chrom', 'position', 'baseFrom', 'baseTo', 'value'])
+cosmicRecord = namedtuple('cosmicRecord', ['chrom', 'position', 'baseFrom', 'baseTo', 'value'])
+snpRecord = namedtuple('snpRecord', ['chrom', 'position', 'baseFrom', 'baseTo', 'value','percent_bg_rate'])
 ReadRecord = namedtuple('ReadRecord', ['read_hdr', 'read_seq', 'read_qual', 'barcode', 'bc_quality', 'uid', 'uid_qual'])
 UniqueSeqRecord = namedtuple('UniqueSeqRecord', ['seqUID', 'read_seq', 'read_cnt', 'primerMatch', 'read1_match', 'read1_pos', 'read2_match', 'read2_pos'])
 WellFamilyRecord = namedtuple('WellFamilyRecord', ['seqUID', 'read_seq', 'barcode', 'uid', 'read_cnt', 'primer'])
@@ -19,6 +21,9 @@ UidStatsRecord = namedtuple('UidStatsRecord', ['barcode', 'uid', 'family_cnt', '
 AlignRecord = namedtuple('AlignRecord', ['seqUID', 'read_seq', 'read_cnt','primer', 'test_seq', 'read1', 'read1_pos', 'read2', 'read2_pos',
                                          'indel_cnt', 'mismatch_cnt', 'ins_bases', 'del_bases', 'snp_cnt', 'cosmic_cnt', 'corr_mismatch_cnt'])
 ChangeRecord = namedtuple('ChangeRecord', ['seqUID', 'chrom', 'position', 'type', 'baseFrom', 'baseTo', 'cycle', 'snp', 'cosmic'])
+SuperMutantTabsRecord = namedtuple('SuperMutantTabsRecord', ['primer','barcode', 'uid', 'chrom', 'position', 'mutType', 'baseFrom', 'baseTo', 'mut_cnt', 'fam_good_reads', \
+                                                             'minMis', 'avgMis', 'maxMis','minCM', 'avgCM', 'maxCM','minInd', 'avgInd', 'maxInd', \
+                                                             'minInsB', 'avgInsB', 'maxInsB','minDelB', 'avgDelB', 'maxDelB','minQual', 'avgQual', 'maxQual'])
 
 
 def get_log_dir(output):
@@ -82,15 +87,17 @@ def condense_ref_data(primer_file, db_file, subset_file):
     for line in refDB_fh:
         l = line.strip().split('\t')
         #There must be a value in the SNP or Somatic Count column
-        if len(l) == 5:
-            chrom = l[0].lower()
+        if len(l) >= 5 and l[4] != '':
+            #be sure to use lowercase chrom and uppercase Base From and To
+            l[0] = l[0].lower()
+            l[2] = l[2].upper()
+            l[3] = l[3].upper()
             #if this reference record is for a chromosome in the study, check the position
-            if chrom in chromRefs:
+            if l[0] in chromRefs:
                 #check all position pairs being used by primers in the study
-                for positions in chromRefs[chrom]:
+                for positions in chromRefs[l[0]]:
                     if l[1] >= positions[0] and l[1] <= positions[1]:
-                        #be sure to use lowercase chrom and uppercase Base From and To
-                        refSubset_fh.write('\t'.join([chrom, l[1], l[2].upper(), l[3].upper(), l[4]]) + '\n')
+                        refSubset_fh.write('\t'.join(l) + '\n')
 
     refDB_fh.close()
     refSubset_fh.close()  
@@ -123,12 +130,16 @@ def load_references(filename, ref_type):
 
     if os.path.isfile(filename):
         
-        #extract the study directory from the filename, look for the COSMIC subset file there
+        #extract the runname directory from the filename, look for the COSMIC subset file there
         input_fh = open(os.path.join(os.path.dirname(filename), os.path.pardir, ref_type + ".txt"),'r')
         
         for line in input_fh:
             #For each line, create a data record with the value of the line (tab separated)
-            r = ReferenceRecord(*line.strip().split('\t'))
+            if ref_type == 'COSMIC':
+                r = cosmicRecord(*line.strip().split('\t'))
+            else: #SNP
+                r = snpRecord(*line.strip().split('\t'))
+                
             #Store the reference record (SNP or COSMIC) in the dictionary.
             if r.chrom in references:
                 references[r.chrom].append((r))
@@ -140,6 +151,35 @@ def load_references(filename, ref_type):
         references['empty'] = True
         
     return references
+
+
+def get_barcode_details(filename, barcode):
+    num = 'NULL'
+    mapBarcode = 'NULL'
+    template = 'NULL'
+    purpose = 'NULL'
+    GEs = 'NULL'
+    
+    if os.path.isfile(filename):
+        #extract the study directory from the filename, look for the BarcodeMap file there
+        input_fh = open(os.path.join(os.path.dirname(filename), os.path.pardir, os.path.pardir,  "BarcodeMap.txt"),'r')
+        
+        for line in input_fh:
+            #For each line, create a list of the fields
+            b = line.strip().split('\t')
+                
+            #Store the barcode info in the dictionary.
+            if b[1] == barcode:
+                num = b[0]
+                mapBarcode = b[1]
+                template = b[3]
+                purpose = b[4]
+                GEs = b[5]
+                break
+                         
+        input_fh.close()
+        
+    return (num, mapBarcode, template, purpose, GEs)
 
 
 #reverse the order of the string and substitute the opposite nucleotide

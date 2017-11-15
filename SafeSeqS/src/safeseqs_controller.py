@@ -16,6 +16,7 @@ import utilities
 import unique
 import align
 import super_mutants
+import well_super_muts
 
 #safeseqs_controller - This process runs the analytical steps of the SAFESEQS pipeline.
 
@@ -143,6 +144,14 @@ def getSAFESEQSParams():
 
     if 'super_mut_perc_homegeneity' not in parms:
         print('Missing super_mut_perc_homegeneity from Settings file')
+        missing_parms =True
+
+    if 'default_indel_rate' not in parms:
+        print('Missing default_indel_rate from Settings file')
+        missing_parms =True
+
+    if 'default_sbs_rate' not in parms:
+        print('Missing default_sbs_rate from Settings file')
         missing_parms =True
 
     if 'load_bad_bc' not in settings:
@@ -624,7 +633,6 @@ def run_align_uniques(parms):
     else:
         logging.warn('Reference file for COSMICs not found in data directory')
               
-    utilities.condense_ref_data(primerset_file, data_input, subset)
     #load a subset of SNPs for the run, using the run's primer set to focus on specific positions for specific chromosomes               
     data_input = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.path.pardir, 'data', "SNP.txt")
     subset = os.path.join(parms['resultsDir'], "SNP.txt")              
@@ -695,7 +703,7 @@ def run_align_uniques(parms):
     print('Align finished.')
 
  
-def run_super_mutants(parms):
+def run_supermutants(parms):
     if skip_step('supermutant'):
         return
     
@@ -766,6 +774,76 @@ def run_super_mutants(parms):
     print('Super Mutant finished.')
 
  
+def run_well_supermutants(parms):
+    if skip_step('wellsupermutant'):
+        return
+    
+    logging.info('Well Super Mutant Started.')
+    print('Well Super Mutant Started.')
+    
+    #make sure the /mutants directory exists in the results directory
+    mutant_directory = os.path.join(parms['resultsDir'], "mutants")
+    if not os.path.isdir(mutant_directory):
+        os.makedirs(mutant_directory)
+
+    current_file = 0
+    workers=[]
+
+    while True:
+        #check for workers that just finished.
+        for p in workers:
+            #exitcode is None if worker still running
+            if p.exitcode is None:
+                continue
+            elif p.exitcode == 0:
+                #Worker finished successfully, checkpoint the step completion and remove the worker
+                record_checkpoint('wellsupermutant', p.name )
+                logging.info('   Well Super Mutant completed for PID: %s' % str(p.pid))
+                print('   Well Super Mutant completed for ' + p.name)
+                workers.remove(p)
+                break
+            else:
+                #process finished but had error
+                logging.info('Well Super Mutant failed for PID: %s' % str(p.pid))
+                raise Exception('Well Super Mutant Worker Failed')
+                 
+        #if there are still files to process 
+        if current_file < len(barcodemap_list):
+            #check to see if the read file was completed on a previous run.
+            if is_done('wellsupermutant', str(barcodemap_list[current_file])):
+                current_file+=1
+                continue
+            
+            #There is work to do, see if we are allowed to start another worker
+            if len(multiprocessing.active_children()) < args.workers:
+                smt_file = os.path.join(parms['resultsDir'], "mutants", barcodemap_list[current_file]+'.smt')
+                us_file = os.path.join(parms['resultsDir'], "UIDstats", barcodemap_list[current_file]+'.UIDstats')
+                wellAmp_file = os.path.join(mutant_directory, barcodemap_list[current_file]+'.wat')
+                mutant_file = os.path.join(mutant_directory, barcodemap_list[current_file]+'.wsmt')
+                
+                mutant_args = Namespace(supMutTabs=smt_file, uidStats=us_file,
+                                       output=mutant_file, wellAmpTabs=wellAmp_file, 
+                                       sm_homogeneity = int(parms['super_mut_perc_homegeneity']),
+                                       indel_rate = int(parms['default_indel_rate']),
+                                       sbs_rate = int(parms['default_sbs_rate']))
+                              
+                p = multiprocessing.Process(target=well_super_muts.perform_well_sm_tabs, name=barcodemap_list[current_file], args=(mutant_args,))
+                p.start()
+                logging.info('   Running well super mutant for %s in PID: %s' %(us_file, str(p.pid)))
+                print('   Running well super mutant for ' + us_file)
+                workers.append(p)
+                current_file+=1
+        
+        #if we are finished all files, stop
+        if current_file == len(barcodemap_list) and len(workers) == 0:
+            break
+        else: 
+            time.sleep(1)    
+    
+    logging.info('Well Super Mutant finished.')
+    print('Well Super Mutant finished.')
+
+ 
 def main():
     try :
         get_args()
@@ -804,8 +882,11 @@ def main():
         run_align_uniques(parms)
              
         #begin tabulations to identify super mutants
-        run_super_mutants(parms)
+        run_supermutants(parms)
              
+        #begin tabulations to identify well super mutants
+        run_well_supermutants(parms)
+        
         logging.info('PROCESSING COMPLETE')
         print('PROCESSING COMPLETE')
     except StopStep as err:

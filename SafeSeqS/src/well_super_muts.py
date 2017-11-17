@@ -25,8 +25,6 @@ def perform_well_sm_tabs(args):
     ampTabs = {}
     wellSupMutTabs = {}
 
-    args.indel_rate = float(args.indel_rate)
-    args.sbs_rate = float(args.sbs_rate)
     args.sm_homogeneity = float(args.sm_homogeneity)/100
       
     logfile = os.path.join(utilities.get_log_dir(args.output),"WellSuperMut"+ str(os.getpid()) + ".log")
@@ -206,10 +204,9 @@ def create_well_supMut_tab_file(args, barcode, wellSupMutTabs, ampTabs):
         #use mut_type from the change details to access the tital uid cnt and sum of good reads from amplicon tabulations
         if change[3] == "SBS":
             background_rate = str(args.sbs_rate)
-        elif change[3] == "INDEL":
+        else: # Indel
             background_rate = str(args.indel_rate)
-        else:
-            background_rate = 'NULL'
+
 
         output_fh.write('\t'.join([barcodeNum, mapBarcode, template, purpose, GEs] + change_details  + \
                                   [str(wellSupMutTabs[change][0]), str(wellSupMutTabs[change][2]), str(wellSupMutTabs[change][6])] +\

@@ -754,8 +754,8 @@ def run_supermutants(parms):
                 
                 mutant_args = Namespace(reads=reads_file, aligns=align_file, changes=change_file, familyReads=wf_file, uidStats=us_file,
                                        output=mutant_file,
-                                       max_mismatches_allowed = int(parms['max_mismatches_for_used_reads']),
-                                       max_indels_allowed = int(parms['max_indels_for_used_reads']))
+                                       max_mismatches_allowed = parms['max_mismatches_for_used_reads'],
+                                       max_indels_allowed = parms['max_indels_for_used_reads'])
                               
                 p = multiprocessing.Process(target=super_mutants.perform_sup_mut_tab, name=barcodemap_list[current_file], args=(mutant_args,))
                 p.start()
@@ -823,9 +823,9 @@ def run_well_supermutants(parms):
                 
                 mutant_args = Namespace(supMutTabs=smt_file, uidStats=us_file,
                                        output=mutant_file, wellAmpTabs=wellAmp_file, 
-                                       sm_homogeneity = int(parms['super_mut_perc_homegeneity']),
-                                       indel_rate = int(parms['default_indel_rate']),
-                                       sbs_rate = int(parms['default_sbs_rate']))
+                                       sm_homogeneity = parms['super_mut_perc_homegeneity'],
+                                       indel_rate = parms['default_indel_rate'],
+                                       sbs_rate = parms['default_sbs_rate'])
                               
                 p = multiprocessing.Process(target=well_super_muts.perform_well_sm_tabs, name=barcodemap_list[current_file], args=(mutant_args,))
                 p.start()

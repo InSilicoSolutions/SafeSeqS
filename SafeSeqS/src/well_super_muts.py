@@ -3,7 +3,7 @@ import os
 import sys, traceback
 import logging
 import utilities
-from safeseqs_controller import barcodes_not_used
+
 #import cProfile
 
 #Read the command line arguments and return them in args

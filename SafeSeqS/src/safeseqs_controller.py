@@ -17,6 +17,7 @@ import unique
 import align
 import super_mutants
 import well_super_muts
+import sample_super_muts
 
 #safeseqs_controller - This process runs the analytical steps of the SAFESEQS pipeline.
 
@@ -844,6 +845,90 @@ def run_well_supermutants(parms):
     print('Well Super Mutant finished.')
 
  
+def run_sample_supermutants(parms):
+    if skip_step('samplesupermutant'):
+        return
+    
+    logging.info('Sample Super Mutant Started.')
+    print('Sample Super Mutant Started.')
+    
+    #make sure the /mutants directory exists in the results directory
+    mutant_directory = os.path.join(parms['resultsDir'], "mutants")
+    if not os.path.isdir(mutant_directory):
+        os.makedirs(mutant_directory)
+        
+    #gather the list of templates (samples) in this run
+    sample_list = []
+    
+    barcodemap_file = os.path.join(args.directory, parms['barcodemap'])
+    barcodeMap_fh = open(barcodemap_file,'r')
+    for line in barcodeMap_fh:
+        b = utilities.BarcodeMapRecord(*line.strip().split('\t'))
+        if b.template != 'Template' and b.template not in sample_list:
+            sample_list.append(b.template)
+    barcodeMap_fh.close()
+
+    current_sample = 0
+    workers=[]
+
+    while True:
+        #check for workers that just finished.
+        for p in workers:
+            #exitcode is None if worker still running
+            if p.exitcode is None:
+                continue
+            elif p.exitcode == 0:
+                #Worker finished successfully, checkpoint the step completion and remove the worker
+                record_checkpoint('samplesupermutant', p.name )
+                logging.info('   Sample Super Mutant completed for PID: %s' % str(p.pid))
+                print('   Sample Super Mutant completed for ' + p.name)
+                workers.remove(p)
+                break
+            else:
+                #process finished but had error
+                logging.info('Sample Super Mutant failed for PID: %s' % str(p.pid))
+                raise Exception('Sample Super Mutant Worker Failed')
+                 
+        #if there are still files to process 
+        if current_sample < len(sample_list):
+            #check to see if the sample was completed on a previous run.
+            if is_done('samplesupermutant', str(sample_list[current_sample])):
+                current_sample+=1
+                continue
+
+            #if we are on the "Not Used" group, check to see if parameter says to skip "Not Used" barcodes
+            if sample_list[current_sample] == "Not Used" and not parms['load_not_used_bc']:
+                current_sample+=1
+                continue
+     
+
+            #There is work to do, see if we are allowed to start another worker
+            if len(multiprocessing.active_children()) < args.workers:
+                
+                sample = sample_list[current_sample]
+                sample_file = os.path.join(mutant_directory, sample_list[current_sample].replace(" ", "_")+'.ssmt')
+                
+                mutant_args = Namespace(output=sample_file,  
+                                        barcodeMap = barcodemap_file,
+                                        template = sample)
+                              
+                p = multiprocessing.Process(target=sample_super_muts.perform_sample_sm_tabs, name=sample_list[current_sample], args=(mutant_args,))
+                p.start()
+                logging.info('   Running sample super mutant for %s in PID: %s' %(sample, str(p.pid)))
+                print('   Running sample super mutant for ' + sample)
+                workers.append(p)
+                current_sample+=1
+        
+        #if we are finished all files, stop
+        if current_sample == len(sample_list) and len(workers) == 0:
+            break
+        else: 
+            time.sleep(1)    
+    
+    logging.info('Sample Super Mutant finished.')
+    print('Sample Super Mutant finished.')
+
+ 
 def main():
     try :
         get_args()
@@ -886,6 +971,10 @@ def main():
              
         #begin tabulations to identify well super mutants
         run_well_supermutants(parms)
+
+        #begin tabulations to identify well super mutants
+        run_sample_supermutants(parms)
+        
         
         logging.info('PROCESSING COMPLETE')
         print('PROCESSING COMPLETE')

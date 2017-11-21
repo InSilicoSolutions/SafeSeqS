@@ -9,6 +9,8 @@ import os
 #
 
 #define common data records for easier reference
+BarcodeMapRecord = namedtuple('BarcodeMapRecord', ['barcodeNumber', 'barcode', 'wbcPlateNumber', 'template', 'purpose', 'gEsWellOrTotalULUsed', 'mutOrTotalGEsWell', 'ampMatchName', 'row', 'col'])
+
 PrimerRecord = namedtuple('PrimerRecord', ['ampMatchName', 'gene', 'read1', 'read2', 'ampSeq', 'target_len', 'chrom', 'readStrand', 'hg19_start', 'hg19_end'])
 ChromRefRecord = namedtuple('ChromRefRecord', ['chrom', 'hg19_start', 'hg19_end'])
 #ReferenceRecord = namedtuple('ReferenceRecord', ['chrom', 'position', 'baseFrom', 'baseTo', 'value'])
@@ -24,6 +26,7 @@ ChangeRecord = namedtuple('ChangeRecord', ['seqUID', 'chrom', 'position', 'type'
 SuperMutantTabsRecord = namedtuple('SuperMutantTabsRecord', ['primer','barcode', 'uid', 'chrom', 'position', 'mutType', 'baseFrom', 'baseTo', 'mut_cnt', 'fam_good_reads', \
                                                              'minMis', 'avgMis', 'maxMis','minCM', 'avgCM', 'maxCM','minInd', 'avgInd', 'maxInd', \
                                                              'minInsB', 'avgInsB', 'maxInsB','minDelB', 'avgDelB', 'maxDelB','minQual', 'avgQual', 'maxQual'])
+WellAmpTabRecord = namedtuple('WellAmpTabRecord', ['barcode', 'primer', 'total_UIDs', 'sumGoodReads'])
 
 
 def get_log_dir(output):

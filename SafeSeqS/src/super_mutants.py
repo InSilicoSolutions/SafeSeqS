@@ -118,10 +118,11 @@ def load_good_chg_positions(args):
     cnt = 0
     for line in changes_fh:
         c = utilities.ChangeRecord(*line.strip().split('\t'))
-        if c.seqUID in chgPositions: #if change is for a good align, we will need to collect its position on the read, and identifying details
+        if c.seqUID in chgPositions: #if change is for a good align, we will need to collect its positionc.position (cycle), and identifying details
             cnt +=1
             stats, changes = chgPositions[c.seqUID] #changes is a pointer to the dictionary inside the tuple for this seqUID
-            changes[int(c.cycle)] = (c.chrom, c.position, c.type, c.baseFrom, c.baseTo) #store the change details, keyed on the position in the original read_sequence
+            #position on Chrom is unique, cycle (position on readSeq) can be duplicate if Indel and SBS occur next to each other
+            changes[int(c.position)] = [(c.chrom, c.position, c.type, c.baseFrom, c.baseTo), c.cycle] #store the change details, keyed on the position in the chrom
     changes_fh.close()
     logging.info('Change Positions added to good aligns %s', str(cnt))
     
@@ -143,10 +144,9 @@ def load_read_qual_at_chg_pos(args, chgPositions, usableReads):
                     qualScores[UID] = {}
                 if seqUID not in qualScores[UID]:
                     qualScores[UID][seqUID] = [int(family_cnt), {}]
-                for cycle in changes:
+                for position in changes:
                     cnt += 1
-                    #c = changes[cycle]
-                    qualScores[UID][seqUID][1][cycle] = [99999,0,0,0] #start with default values
+                    qualScores[UID][seqUID][1][position] = [99999,0,0,0] #start with default values
     logging.info('Change Positions on Usable UIDs %s', str(cnt))
 
     reads_fh = open(args.reads,'r')
@@ -159,11 +159,11 @@ def load_read_qual_at_chg_pos(args, chgPositions, usableReads):
             seqUID = usableReads[r.uid][1][compRead][0]#second position at the UID level, first position at the read level
             #is this line for a read with changes
             if seqUID in qualScores[r.uid]:
-                for cycle in qualScores[r.uid][seqUID][1]:
+                for position in qualScores[r.uid][seqUID][1]:
                     #cycle is the exact position in the read; python strings start at 0 so subtract 1
-                    pos = cycle -1
+                    pos = int(chgPositions[seqUID][1][position][1]) -1
                     read_pos_qual = int(ord(r.read_qual[pos]) -33) #ascii -33
-                    qualScores[r.uid][seqUID][1][cycle] = aggregate_one(qualScores[r.uid][seqUID][1][cycle], read_pos_qual)
+                    qualScores[r.uid][seqUID][1][position] = aggregate_one(qualScores[r.uid][seqUID][1][position], read_pos_qual)
     reads_fh.close()
     logging.info('Read Qualities aggregated on Usable UIDs Change Positions')
         
@@ -178,13 +178,13 @@ def aggregate_scores(qualScores, chgPositions, usableReads):
             supMutTab[uid] = {}
         for seqUID in qualScores[uid]: #each unique read with changes
             a_cnts = chgPositions[seqUID][0]
-            for cycle in qualScores[uid][seqUID][1]:
-                change = chgPositions[seqUID][1][cycle] #this will be a tuple with the change details
+            for position in qualScores[uid][seqUID][1]:
+                change = chgPositions[seqUID][1][position][0] #this will be a tuple with the change details
                 if change not in supMutTab[uid]:
                     #key is tuple of change details: fam_cnt, primer, align counts -initial (min,max,sum,cnt) AND quality scores
                     supMutTab[uid][change] = [qualScores[uid][seqUID][0], a_cnts[0], \
                         a_cnts[1], a_cnts[1], a_cnts[1], 1, a_cnts[2], a_cnts[2], a_cnts[2], 1, a_cnts[3], a_cnts[3], a_cnts[3], 1, \
-                        a_cnts[4], a_cnts[4], a_cnts[4], 1, a_cnts[5], a_cnts[5], a_cnts[5], 1] + qualScores[uid][seqUID][1][cycle]
+                        a_cnts[4], a_cnts[4], a_cnts[4], 1, a_cnts[5], a_cnts[5], a_cnts[5], 1] + qualScores[uid][seqUID][1][position]
                 else:
                     #aggregate this change instance with all others of its type in the UID
                     #add to count for how many reads were in this well_family_read count
@@ -200,7 +200,7 @@ def aggregate_scores(qualScores, chgPositions, usableReads):
                     #corr_mismatch_cnt min, max, sum, cnt: positions 18-21
                     supMutTab[uid][change][18:22] = aggregate_one(supMutTab[uid][change][18:22], a_cnts[5])
                     #quality scores min, max, sum, cnt: positions 22-25
-                    supMutTab[uid][change][22:26] = aggregate_lists(supMutTab[uid][change][22:26], qualScores[uid][seqUID][1][cycle])
+                    supMutTab[uid][change][22:26] = aggregate_lists(supMutTab[uid][change][22:26], qualScores[uid][seqUID][1][position])
     return(supMutTab)
 
 

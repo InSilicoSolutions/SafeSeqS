@@ -1,7 +1,5 @@
 import argparse
-from argparse import Namespace
 import gzip
-import io
 import itertools
 import time
 import json
@@ -18,6 +16,8 @@ import align
 import super_mutants
 import well_super_muts
 import sample_super_muts
+import uid_stats
+import opticalDuplicates
 
 #safeseqs_controller - This process runs the analytical steps of the SAFESEQS pipeline.
 
@@ -26,7 +26,7 @@ class StopStep(Exception):
 
 #globals
 args = None
-logfile = ''  #string holding the logfile directory and name
+#logfile = ''  #string holding the logfile directory and name
 checkpoints = {} #dictionary holding checkpoints in memory
 fh_limit = 0 #normal Windows limit is 512, Linux is 1024
 barcodemap_list = [] #full list; may include one entry for all "bad" and/or "merge" barcodes if user has requested that they be saved
@@ -100,6 +100,10 @@ def getSAFESEQSParams():
         print('Missing barcodes_files from JSON file')
         missing_parms =True
          
+    if 'ascii_adj' not in parms:
+        print('Missing ascii adjustment constant from JSON file')
+        missing_parms =True
+         
     if 'barcodemap' not in parms:
         print('Missing barcodemap from JSON file')
         missing_parms =True
@@ -130,6 +134,15 @@ def getSAFESEQSParams():
             parms['mark_UIDs_with_Ns_UnUsable'] = True
         else:
             parms['mark_UIDs_with_Ns_UnUsable'] = False       
+
+    if 'perform_opt_dup_removal' not in settings:
+        parms['perform_opt_dup_removal'] = False
+    else:
+        parms['perform_opt_dup_removal'] = parms['perform_opt_dup_removal'].lower()
+        if parms['perform_opt_dup_removal'] == "yes" or parms['perform_opt_dup_removal'] == "y":
+            parms['perform_opt_dup_removal'] = True
+        else:
+            parms['perform_opt_dup_removal'] = False       
 
     if 'max_amp_per_UID_family' not in parms:
         print('Missing max_amp_per_UID_family from Settings file')
@@ -586,9 +599,9 @@ def run_sort_unique(parms):
                 family_file = os.path.join(family_directory, barcodemap_list[current_file]+'.family')
                 primerset_file = os.path.join(args.directory, 'Primers.txt')                 
                 
-                unique_args = Namespace(input=read, output=result_file, family=family_file, primerset=primerset_file)
+                subprocess_args = argparse.Namespace(input=read, output=result_file, family=family_file, primerset=primerset_file)
                
-                p = multiprocessing.Process(target=unique.perform_unique, name=barcodemap_list[current_file], args=(unique_args,))
+                p = multiprocessing.Process(target=unique.perform_unique, name=barcodemap_list[current_file], args=(subprocess_args,))
                 p.start()
                 logging.info('   Running unique for %s in PID: %s' %(read, str(p.pid)))
                 print('   Running unique for ' + read)
@@ -620,10 +633,6 @@ def run_align_uniques(parms):
     change_directory = os.path.join(parms['resultsDir'], "changes")
     if not os.path.isdir(change_directory):
         os.makedirs(change_directory)
-    #make sure the /UIDstats directory exists in the results directory
-    us_directory = os.path.join(parms['resultsDir'], "UIDstats")
-    if not os.path.isdir(us_directory):
-        os.makedirs(us_directory)
 
     #load a subset of COSMICs for the run, using the runs's primer set to focus on specific positions for specific chromosomes               
     primerset_file = os.path.join(args.directory, 'Primers.txt')
@@ -674,20 +683,19 @@ def run_align_uniques(parms):
             #There is work to do, see if we are allowed to start another worker
             if len(multiprocessing.active_children()) < args.workers:
                 unique_file = os.path.join(parms['resultsDir'], "unique", barcodemap_list[current_file]+'.unique')
-                wf_file = os.path.join(parms['resultsDir'], "family", barcodemap_list[current_file]+'.family')
                 align_file = os.path.join(align_directory, barcodemap_list[current_file]+'.align')
                 change_file = os.path.join(change_directory, barcodemap_list[current_file]+'.changes')
-                us_file = os.path.join(us_directory, barcodemap_list[current_file]+'.UIDstats')
+                gr_file = os.path.join(align_directory, barcodemap_list[current_file]+'.goodReads')
                 
-                align_args = Namespace(input=unique_file, output=align_file, changes=change_file, wellfamilies=wf_file, UIDstats=us_file,
-                                       primerset=primerset_file,
-                                       max_mismatches_allowed = parms['max_mismatches_for_used_reads'],
-                                       max_indels_allowed = parms['max_indels_for_used_reads'],
-                                       min_good_reads = parms['min_good_reads_usable_family'],
-                                       min_frac_good_reads = parms['min_perc_good_reads_per_UID_family'],
-                                       mark_UIDs_with_Ns_UnUsable = parms['mark_UIDs_with_Ns_UnUsable'])
+                subprocess_args = argparse.Namespace(input=unique_file, 
+                                    output=align_file, 
+                                    changes=change_file,  
+                                    goodReads=gr_file,
+                                    primerset=primerset_file,
+                                    max_mismatches_allowed = parms['max_mismatches_for_used_reads'],
+                                    max_indels_allowed = parms['max_indels_for_used_reads'])
                               
-                p = multiprocessing.Process(target=align.perform_align, name=barcodemap_list[current_file], args=(align_args,))
+                p = multiprocessing.Process(target=align.perform_align, name=barcodemap_list[current_file], args=(subprocess_args,))
                 p.start()
                 logging.info('   Running align for %s in PID: %s' %(unique_file, str(p.pid)))
                 print('   Running align for ' + unique_file)
@@ -702,6 +710,158 @@ def run_align_uniques(parms):
     
     logging.info('Align finished.')
     print('Align finished.')
+
+def remove_optical_duplicates(parms):    
+    if skip_step('optdup'):
+        return
+    
+    logging.info('Optical Duplicates Started.')
+    print('Optical Duplicates Started.')
+    
+    #make sure the /UIDstats directory exists in the results directory
+    us_directory = os.path.join(parms['resultsDir'], "UIDstats")
+    if not os.path.isdir(us_directory):
+        os.makedirs(us_directory)
+
+    current_file = 0
+    workers=[]
+
+    while True:
+        #check for workers that just finished.
+        for p in workers:
+            #exitcode is None if worker still running
+            if p.exitcode is None:
+                continue
+            elif p.exitcode == 0:
+                #Worker finished successfully, checkpoint the step completion and remove the worker
+                record_checkpoint('optdup', p.name )
+                logging.info('   Optical Duplicates completed for PID: %s' % str(p.pid))
+                print('   Optical Duplicates completed for ' + p.name)
+                workers.remove(p)
+                break
+            else:
+                #process finished but had error
+                logging.info('Optical Duplicates failed for PID: %s' % str(p.pid))
+                raise Exception('Optical Duplicates Worker Failed')
+                 
+        #if there are still files to process 
+        if current_file < len(barcodemap_list):
+            #check to see if the read file was completed on a previous run.
+            if is_done('optdup', str(barcodemap_list[current_file])):
+                current_file+=1
+                continue
+            
+            #There is work to do, see if we are allowed to start another worker
+            if len(multiprocessing.active_children()) < args.workers:
+                input_file = os.path.join(parms['resultsDir'], "split", barcodemap_list[current_file]+'.reads')
+                gr_file = os.path.join(parms['resultsDir'], "align", barcodemap_list[current_file]+'.goodReads')
+                cFc_file = os.path.join(us_directory, barcodemap_list[current_file]+'.cFc')
+
+                subprocess_args = argparse.Namespace(input=input_file, 
+                                    goodreads=gr_file,
+                                    output=cFc_file)
+                              
+                p = multiprocessing.Process(target=opticalDuplicates.find_optical_duplicates, name=barcodemap_list[current_file], args=(subprocess_args,))
+                p.start()
+                logging.info('   Running Optical Duplicates for %s in PID: %s' %(input_file, str(p.pid)))
+                print('   Running Optical Duplicates for ' + input_file)
+                workers.append(p)
+                current_file+=1
+        
+        #if we are finished all files, stop
+        if current_file == len(barcodemap_list) and len(workers) == 0:
+            break
+        else: 
+            time.sleep(1)    
+    
+    logging.info('Optical Duplicates finished.')
+    print('Optical Duplicates finished.')
+
+ 
+def run_uidstats(parms):
+    if skip_step('uidstats'):
+        return
+    
+    logging.info('UIDStats Started.')
+    print('UIDStats Started.')
+    
+    #make sure the /UIDstats directory exists in the results directory
+    us_directory = os.path.join(parms['resultsDir'], "UIDstats")
+    if not os.path.isdir(us_directory):
+        os.makedirs(us_directory)
+
+    current_file = 0
+    workers=[]
+
+    while True:
+        #check for workers that just finished.
+        for p in workers:
+            #exitcode is None if worker still running
+            if p.exitcode is None:
+                continue
+            elif p.exitcode == 0:
+                #Worker finished successfully, checkpoint the step completion and remove the worker
+                record_checkpoint('uidstats', p.name )
+                logging.info('   UIDStats completed for PID: %s' % str(p.pid))
+                print('   UIDStats completed for ' + p.name)
+                workers.remove(p)
+                break
+            else:
+                #process finished but had error
+                logging.info('UIDStats failed for PID: %s' % str(p.pid))
+                raise Exception('UIDStats Worker Failed')
+                 
+        #if there are still files to process 
+        if current_file < len(barcodemap_list):
+            #check to see if the read file was completed on a previous run.
+            if is_done('uidstats', str(barcodemap_list[current_file])):
+                current_file+=1
+                continue
+            
+            #There is work to do, see if we are allowed to start another worker
+            if len(multiprocessing.active_children()) < args.workers:
+                input_file = os.path.join(parms['resultsDir'], "family", barcodemap_list[current_file]+'.family')
+                gr_file = os.path.join(parms['resultsDir'], "align", barcodemap_list[current_file]+'.goodReads')
+                cFc_file = os.path.join(us_directory, barcodemap_list[current_file]+'.cFc')
+                us_file = os.path.join(us_directory, barcodemap_list[current_file]+'.UIDstats')
+               
+                if parms["perform_opt_dup_removal"]:
+                    subprocess_args = argparse.Namespace(input=input_file, 
+                                        goodReads=gr_file, 
+                                        cFc=cFc_file,
+                                        output=us_file, 
+                                        max_mismatches_allowed = parms['max_mismatches_for_used_reads'],
+                                        max_indels_allowed = parms['max_indels_for_used_reads'],
+                                        min_good_reads = parms['min_good_reads_usable_family'],
+                                        min_frac_good_reads = parms['min_perc_good_reads_per_UID_family'],
+                                        mark_UIDs_with_Ns_UnUsable = parms['mark_UIDs_with_Ns_UnUsable'],
+                                        ascii_adj = parms['ascii_adj'])
+                else:
+                    subprocess_args = argparse.Namespace(input=input_file, 
+                                        goodReads=gr_file, 
+                                        output=us_file, 
+                                        max_mismatches_allowed = parms['max_mismatches_for_used_reads'],
+                                        max_indels_allowed = parms['max_indels_for_used_reads'],
+                                        min_good_reads = parms['min_good_reads_usable_family'],
+                                        min_frac_good_reads = parms['min_perc_good_reads_per_UID_family'],
+                                        mark_UIDs_with_Ns_UnUsable = parms['mark_UIDs_with_Ns_UnUsable'],
+                                        ascii_adj = parms['ascii_adj'])
+                              
+                p = multiprocessing.Process(target=uid_stats.calculate_uid_stats, name=barcodemap_list[current_file], args=(subprocess_args,))
+                p.start()
+                logging.info('   Running UIDStats for %s in PID: %s' %(input_file, str(p.pid)))
+                print('   Running UIDStats for ' + input_file)
+                workers.append(p)
+                current_file+=1
+        
+        #if we are finished all files, stop
+        if current_file == len(barcodemap_list) and len(workers) == 0:
+            break
+        else: 
+            time.sleep(1)    
+    
+    logging.info('UIDStats finished.')
+    print('UIDStats finished.')
 
  
 def run_supermutants(parms):
@@ -753,10 +913,15 @@ def run_supermutants(parms):
                 us_file = os.path.join(parms['resultsDir'], "UIDstats", barcodemap_list[current_file]+'.UIDstats')
                 mutant_file = os.path.join(mutant_directory, barcodemap_list[current_file]+'.smt')
                 
-                mutant_args = Namespace(reads=reads_file, aligns=align_file, changes=change_file, familyReads=wf_file, uidStats=us_file,
-                                       output=mutant_file,
-                                       max_mismatches_allowed = parms['max_mismatches_for_used_reads'],
-                                       max_indels_allowed = parms['max_indels_for_used_reads'])
+                mutant_args = argparse.Namespace(reads=reads_file, 
+                                aligns=align_file, 
+                                changes=change_file, 
+                                familyReads=wf_file, 
+                                uidStats=us_file,
+                                output=mutant_file,
+                                max_mismatches_allowed = parms['max_mismatches_for_used_reads'],
+                                max_indels_allowed = parms['max_indels_for_used_reads'],
+                                ascii_adj = parms['ascii_adj'])
                               
                 p = multiprocessing.Process(target=super_mutants.perform_sup_mut_tab, name=barcodemap_list[current_file], args=(mutant_args,))
                 p.start()
@@ -822,7 +987,7 @@ def run_well_supermutants(parms):
                 wellAmp_file = os.path.join(mutant_directory, barcodemap_list[current_file]+'.wat')
                 mutant_file = os.path.join(mutant_directory, barcodemap_list[current_file]+'.wsmt')
                 
-                mutant_args = Namespace(supMutTabs=smt_file, uidStats=us_file,
+                mutant_args = argparse.Namespace(supMutTabs=smt_file, uidStats=us_file,
                                        output=mutant_file, wellAmpTabs=wellAmp_file, 
                                        sm_homogeneity = parms['super_mut_perc_homegeneity'],
                                        indel_rate = parms['default_indel_rate'],
@@ -908,7 +1073,7 @@ def run_sample_supermutants(parms):
                 sample = sample_list[current_sample]
                 sample_file = os.path.join(mutant_directory, sample_list[current_sample].replace(" ", "_")+'.ssmt')
                 
-                mutant_args = Namespace(output=sample_file,  
+                mutant_args = argparse.Namespace(output=sample_file,  
                                         barcodeMap = barcodemap_file,
                                         template = sample)
                               
@@ -944,7 +1109,7 @@ def main():
         if not os.path.isdir(log_directory):
             os.makedirs(log_directory)
     
-        global logfile
+#        global logfile
         logfile = os.path.join(args.directory, args.runname, "log", "SafeSeqS.log")
         logging.basicConfig(
             format='%(asctime)s %(levelname)s: %(message)s', 
@@ -966,13 +1131,19 @@ def main():
         #Use primer info to determine where changes exist in the read sequence
         run_align_uniques(parms)
              
+        if parms["perform_opt_dup_removal"]:
+            remove_optical_duplicates(parms)        
+        
+        #calculate the UID stats
+        run_uidstats(parms)        
+
         #begin tabulations to identify super mutants
         run_supermutants(parms)
              
         #begin tabulations to identify well super mutants
         run_well_supermutants(parms)
 
-        #begin tabulations to identify well super mutants
+        #identify sample super mutants
         run_sample_supermutants(parms)
         
         

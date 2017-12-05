@@ -1,6 +1,7 @@
 import argparse
 import os
-import sys, traceback
+import sys
+import traceback
 import logging
 import utilities
 
@@ -167,7 +168,6 @@ def create_well_supMut_tab_file(args, barcode, wellSupMutTabs, ampTabs):
     #If there are potential super mutants to write, load the reference data from files
     if len(wellSupMutTabs) > 0:
         barcodeNum, mapBarcode, template, purpose, GEs = utilities.get_barcode_details(args.output, barcode)
-        SNPs = utilities.load_references(args.output, 'SNP')
         
     for change in wellSupMutTabs:
         change_details = [change[0], barcode, change[1], change[2], change[3], change[4], change[5]]

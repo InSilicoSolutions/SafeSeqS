@@ -1,8 +1,8 @@
 import argparse
 import os
-import sys, traceback
+import sys
+import traceback
 import logging
-from collections import namedtuple
 import utilities
 
 #import cProfile
@@ -39,41 +39,27 @@ import utilities
 #                COSMIC
 #
 
-#create a global dictionary to store primers form the primer file
-primer_dict = {}
-
-#create a global dictionary to store seqUIDs and primers for reads that match Good Read criteria
-good_reads = {}
- 
 #Read the command line arguments and return them in args
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('-i','--input', help='UniqueReadSequences file.', required=True)
     parser.add_argument('-o', '--output', help='SequenceAlignment file.', required=True)
     parser.add_argument('-c', '--changes', help='Changes file.', required=True)
-    parser.add_argument('-w','--wellfamilies', help='Well Families file.', required=True)
-    parser.add_argument('-u', '--UIDstats', help='UIDstats file.', required=True)
+    parser.add_argument('-g', '--goodReads', help='File containing seqUIds and read seqs from good reads. To be used by Optical Dups and UIDstats processes.', required=True)
     parser.add_argument('-p', '--primerset', help='The primer set file name.', required=True)
     parser.add_argument('-mm', '--max_mismatches_allowed', help='The maximum number of mismatches that a read can contain and still be a good read.', required=True)
     parser.add_argument('-mi', '--max_indels_allowed', help='The maximum number of indels that a read can contain and still be a good read.', required=True)
-    parser.add_argument('-mg', '--min_good_reads', help='The minimum good reads a UIDfamily must contain to be usable.', required=True)
-    parser.add_argument('-mf', '--min_frac_good_reads', help='The minimum percent of reads that must be good reads for a UIDfamily to be usable.', required=True)
-    parser.add_argument('-un', '--mark_UIDs_with_Ns_UnUsable', help='flag indicating whether uids with Ns are usable.', required=True)
 
     args = parser.parse_args()
     return args    
 
 
 def perform_align(args):
-    global primer_dict
-    global good_reads
     cosmics = {}
     snps = {}
     
     args.max_mismatches_allowed = int(args.max_mismatches_allowed)
     args.max_indels_allowed = int(args.max_indels_allowed)
-    args.min_good_reads = int(args.min_good_reads)
-    args.min_frac_good_reads = float(args.min_frac_good_reads)/100
     
     logfile = os.path.join(utilities.get_log_dir(args.output),"Align"+ str(os.getpid()) + ".log")
     logging.basicConfig(
@@ -89,6 +75,8 @@ def perform_align(args):
         input_fh = open(args.input,'r')
         output_fh = open(args.output,'w')
         changes_fh = open(args.changes,'w')
+        gr_fh = open(args.goodReads,'w')
+
         
         #load primers from file into dictionary
         primer_dict = utilities.load_primers(args.primerset)
@@ -118,7 +106,7 @@ def perform_align(args):
 
                 #if the test sequence matches the target amplicon sequence, we have a perfect match. Simply write the alignment record with no changes.  
                 if test_seq != p.ampSeq:
-                #if there is a mismatch, insertions or deletions (indels) and/or Single Base Substitutions (SBS) exist, finda and record the changes      
+                #if there is a mismatch, insertions or deletions (indels) and/or Single Base Substitutions (SBS) exist, find a and record the changes      
                     pos = -1 #initialize the indel loop counter to -1 so that if there is no indel, SBS mismatch check won't think it was position 0
                     indel_len = len(test_seq) - len(p.ampSeq)
                     
@@ -200,14 +188,14 @@ def perform_align(args):
                 #determine if this unique read sequence meets the settings for a Good Read
                 if corrected_mismatch_cnt <= args.max_mismatches_allowed and indel_cnt <= args.max_indels_allowed:
                     #save this ID for building UIDstats later
-                    good_reads[u.seqUID] = 'y'
-                        
+                    gr_fh.write('\t'.join([u.seqUID, u.read_seq]) + '\n')
+
+
         input_fh.close()
         output_fh.close()
         changes_fh.close()
+        gr_fh.close()
         
-        calculate_uid_stats(args)
-
         logging.info('ALIGN PROCESSING COMPLETED for %s', args.input)
         return
     
@@ -272,62 +260,7 @@ def compare_sequences(reference, test):
                     
     return score
 
-def calculate_uid_stats(args):
-    #first create a dictionary of UIDs from Well Family Reads File with each of its seqUIDs and read count.
-    #this will organize and sort them from the Well Family Reads file
-    UIDs = {}
 
-    input_fh = open(args.wellfamilies,'r')
-    #read through well families, creating a dictionary of UIDs with their seqUIds(ids for unique read sequences), read counts, and primer
-    for line in input_fh:
-        #For each line, create a data record with the value of the line (tab separated)
-        w = utilities.WellFamilyRecord(*line.strip().split('\t'))
-        barcode = w.barcode
-        if w.uid not in UIDs:
-            #if this is the first we have seen of this UID, create a dictionary entry to hold all of its seqUIds
-            UIDs[w.uid] = {}
-
-        #store the read count and primer for the read sequence
-        if w.seqUID not in UIDs[w.uid]:
-            UIDs[w.uid][w.seqUID] = (int(w.read_cnt), w.primer)
-
-    input_fh.close()  
-
-    #now, step through the UIDs dictionary and assemble it's UIDstats
-    us_fh = open(args.UIDstats,'w')
-
-    for uid in UIDs:
-        family_cnt = 0
-        family_good_cnt = 0
-        family_diversity = 0
-        primers = []
-        amplicon = ''
-        usable = 0
-        
-        for seqUID in UIDs[uid]:
-            family_diversity += 1
-            family_cnt = family_cnt + UIDs[uid][seqUID][0]
-            
-            if seqUID in good_reads:
-                family_good_cnt = family_good_cnt + UIDs[uid][seqUID][0]
-
-            if UIDs[uid][seqUID][1] != "No Match" and UIDs[uid][seqUID][1] not in primers:
-                primers.append(UIDs[uid][seqUID][1])
-
-        amplicon_diversity = len(primers)
-        if amplicon_diversity == 1:
-            amplicon = primers[0]
-            if uid.find("N") > -1 and args.mark_UIDs_with_Ns_UnUsable: #if the UID had an N AND the flag says skip Ns, don't use this one
-                usable = 0
-            elif family_good_cnt >= args.min_good_reads and (family_good_cnt/family_cnt) > args.min_frac_good_reads:
-                usable = 1
-        
-        us_fh.write('\t'.join([barcode, uid, str(family_cnt), str(family_diversity), str(family_good_cnt), str(amplicon_diversity), amplicon, str(usable)]) + '\n')
- 
-    us_fh.close()
-    return
-
-    
 def main():
      
     args = get_args()

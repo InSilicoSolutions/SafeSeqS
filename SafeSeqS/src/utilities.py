@@ -1,21 +1,14 @@
 from collections import namedtuple
 import os
+import logging
 
-# Utilities  Reverse Compliment
-#            Load Primers
-#            Primer file Format must be tab delimited and contain: AmpMatchName, Gene, 
-#            Read1PrimerSeq, Read2PrimerSeq, AmpliconSeq, TargetSeqLength, Chrom, 
-#            ReadStrand, Hg19Start, Hg19End
-#
 
 #define common data records for easier reference
 BarcodeMapRecord = namedtuple('BarcodeMapRecord', ['barcodeNumber', 'barcode', 'wbcPlateNumber', 'template', 'purpose', 'gEsWellOrTotalULUsed', 'mutOrTotalGEsWell', 'ampMatchName', 'row', 'col'])
 
 PrimerRecord = namedtuple('PrimerRecord', ['ampMatchName', 'gene', 'read1', 'read2', 'ampSeq', 'target_len', 'chrom', 'readStrand', 'hg19_start', 'hg19_end'])
 ChromRefRecord = namedtuple('ChromRefRecord', ['chrom', 'hg19_start', 'hg19_end'])
-#ReferenceRecord = namedtuple('ReferenceRecord', ['chrom', 'position', 'baseFrom', 'baseTo', 'value'])
-cosmicRecord = namedtuple('cosmicRecord', ['chrom', 'position', 'baseFrom', 'baseTo', 'value'])
-snpRecord = namedtuple('snpRecord', ['chrom', 'position', 'baseFrom', 'baseTo', 'value','percent_bg_rate'])
+ReferenceRecord = namedtuple('ReferenceRecord', ['chrom', 'position', 'baseFrom', 'baseTo', 'value'])
 ReadRecord = namedtuple('ReadRecord', ['read_hdr', 'read_seq', 'read_qual', 'barcode', 'bc_quality', 'uid', 'uid_qual'])
 UniqueSeqRecord = namedtuple('UniqueSeqRecord', ['seqUID', 'read_seq', 'read_cnt', 'primerMatch', 'read1_match', 'read1_pos', 'read2_match', 'read2_pos'])
 WellFamilyRecord = namedtuple('WellFamilyRecord', ['seqUID', 'read_seq', 'barcode', 'uid', 'read_cnt', 'primer'])
@@ -138,10 +131,7 @@ def load_references(filename, ref_type):
         
         for line in input_fh:
             #For each line, create a data record with the value of the line (tab separated)
-            if ref_type == 'COSMIC':
-                r = cosmicRecord(*line.strip().split('\t'))
-            else: #SNP
-                r = snpRecord(*line.strip().split('\t'))
+            r = ReferenceRecord(*line.strip().split('\t'))
                 
             #Store the reference record (SNP or COSMIC) in the dictionary.
             if r.chrom in references:
@@ -202,4 +192,19 @@ def reverse_compliment(string):
             revCompSeq = revCompSeq + "N"
 
     return revCompSeq
+
+
+def load_good_reads(filename):
+    good_reads = {}
+    gr_fh = open(filename,'r')
+    #loop through the list of good reads for the barcode and store them in a list
+    for line in gr_fh:
+        l = line.strip().split('\t')
+        good_reads[l[0]] = True
+    gr_fh.close()    
+    logging.info('Loaded %s good reads', str(len(good_reads)))
+
+
+    return(good_reads)
+
 

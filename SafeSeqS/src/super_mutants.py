@@ -18,6 +18,7 @@ def get_args():
     parser.add_argument('-o', '--output', help='The Super Mutant Tabulation file name', required=True)
     parser.add_argument('-mm', '--max_mismatches_allowed', help='The maximum number of mismatches that a read can contain and still be a good read.', required=True)
     parser.add_argument('-mi', '--max_indels_allowed', help='The maximum number of indels that a read can contain and still be a good read.', required=True)
+    parser.add_argument('-aa', '--ascii_adj', help='The constant that must be subtracted from the ascii quality score to get the integer score.', required=True)
 
     args = parser.parse_args()
     return args    
@@ -31,6 +32,7 @@ def perform_sup_mut_tab(args):
     
     args.max_indels_allowed = int(args.max_indels_allowed)
     args.max_mismatches_allowed = int(args.max_mismatches_allowed)
+    args.ascii_adj = int(args.ascii_adj)
       
     logfile = os.path.join(utilities.get_log_dir(args.output),"SuperMut"+ str(os.getpid()) + ".log")
     logging.basicConfig(
@@ -122,7 +124,9 @@ def load_good_chg_positions(args):
             cnt +=1
             stats, changes = chgPositions[c.seqUID] #changes is a pointer to the dictionary inside the tuple for this seqUID
             #position on Chrom is unique, cycle (position on readSeq) can be duplicate if Indel and SBS occur next to each other
-            changes[int(c.position)] = [(c.chrom, c.position, c.type, c.baseFrom, c.baseTo), c.cycle] #store the change details, keyed on the position in the chrom
+#            changes[int(c.position)] = [(c.chrom, c.position, c.type, c.baseFrom, c.baseTo), c.cycle] #store the change details, keyed on the position in the chrom
+            #combine cycle (position on readSeq) with type of change to create a unique key 
+            changes[c.cycle+c.type] = [(c.chrom, c.position, c.type, c.baseFrom, c.baseTo), c.cycle] #store the change details, keyed on the position in the chrom
     changes_fh.close()
     logging.info('Change Positions added to good aligns %s', str(cnt))
     
@@ -162,7 +166,7 @@ def load_read_qual_at_chg_pos(args, chgPositions, usableReads):
                 for position in qualScores[r.uid][seqUID][1]:
                     #cycle is the exact position in the read; python strings start at 0 so subtract 1
                     pos = int(chgPositions[seqUID][1][position][1]) -1
-                    read_pos_qual = int(ord(r.read_qual[pos]) -33) #ascii -33
+                    read_pos_qual = int(ord(r.read_qual[pos]) - args.ascii_adj)
                     qualScores[r.uid][seqUID][1][position] = aggregate_one(qualScores[r.uid][seqUID][1][position], read_pos_qual)
     reads_fh.close()
     logging.info('Read Qualities aggregated on Usable UIDs Change Positions')

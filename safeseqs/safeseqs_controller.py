@@ -10,14 +10,14 @@ import multiprocessing
 import platform
 import logging
 
-import utilities
-import unique
-import align
-import super_mutants
-import well_super_muts
-import sample_super_muts
-import uid_stats
-import opticalDuplicates
+from safeseqs import utilities
+from safeseqs import unique
+from safeseqs import align
+from safeseqs import super_mutants
+from safeseqs import well_super_muts
+from safeseqs import sample_super_muts
+from safeseqs import uid_stats
+from safeseqs import opticalDuplicates
 
 #safeseqs_controller - This process runs the analytical steps of the SAFESEQS pipeline.
 

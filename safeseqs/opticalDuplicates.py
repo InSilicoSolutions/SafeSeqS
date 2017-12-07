@@ -1,13 +1,14 @@
 import argparse
 import os
-import sys, traceback
+import sys
+import traceback
 import logging
 import binascii
 import math
 from scipy.cluster.hierarchy import fclusterdata
-import utilities
+from safeseqs import utilities
 
-#import cProfile
+
 #Read the command line arguments and return them in args
 def get_args():
     parser = argparse.ArgumentParser()
@@ -142,4 +143,3 @@ def main():
     
        
 if __name__ == "__main__": main()
-#if __name__ == "__main__": cProfile.run('main()')

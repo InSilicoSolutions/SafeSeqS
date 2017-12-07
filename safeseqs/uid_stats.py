@@ -3,7 +3,7 @@ import os
 import sys
 import traceback
 import logging
-import utilities
+from safeseqs import utilities
 
 #import cProfile
 #Read the command line arguments and return them in args
@@ -144,4 +144,3 @@ def main():
     
        
 if __name__ == "__main__": main()
-#if __name__ == "__main__": cProfile.run('main()')

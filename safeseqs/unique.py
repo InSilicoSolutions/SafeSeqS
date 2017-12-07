@@ -4,9 +4,7 @@ import sys
 import traceback
 import logging
 import zlib
-import utilities
-
-#import cProfile
+from safeseqs import utilities
 
 # unique     This program takes file of fastq reads that have been split by barcode and  
 #            compresses it further into a list of the unique read sequences. The output 
@@ -162,4 +160,3 @@ def main():
     
        
 if __name__ == "__main__": main()
-#if __name__ == "__main__": cProfile.run('main()')

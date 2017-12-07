@@ -3,9 +3,9 @@ import os
 import sys
 import traceback
 import logging
-import utilities
+from safeseqs import utilities
 
-#import cProfile
+
 # Align      This program takes the output after the Unique Reads have been identified .
 #            The output is a tab delimited file with one line per unique read sequence with both a Read1 match and Read2 match.
 #
@@ -275,4 +275,3 @@ def main():
     
        
 if __name__ == "__main__": main()
-#if __name__ == "__main__": cProfile.run('main()')

@@ -14,7 +14,7 @@ The identification of mutations that are present in a small fraction of DNA temp
 Documentation
 -------------
 
-Please see the `documentation <https://github.com/xxxx/SafeSeqS/wiki>`_ on github for complete usage details.
+Please see the `documentation <https://github.com/InSilicoSolutions/SafeSeqS/wiki>`_ on github for complete usage details.
 
 Installation
 ------------
@@ -31,7 +31,7 @@ are not already installed.
 **Required packages:**
 
 * scipy
-* pypiwin32 (for Windows machines)
+* pywin32 (for Windows machines)
 * resource (for Linux machines)
 
 Note the pip scipy installation can sometimes have issues.  If so, alternate methods of installing scipy may be preferable.  See scipy `install <http://www.scipy.org/install.html>`_ for details.  Then rerun pip install SafeSeqS.

@@ -6,18 +6,18 @@ def readme():
         return f.read()
 
 
-setup(name='SafeSeqS',
+setup(name='safeseqs',
       version='1.1',
-      description='SafeSeqs',
+      description='Safe-SequencingSystem (SafeSeqs) data processing pipeline',
       long_description=readme(),
-      url='http://jhu.edu',
+      url='https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3111315/',
       author='Kenneth Kinzler',
       author_email='kinzlke@jhmi.edu',
       license='',
       packages=find_packages(),
       install_requires=[
           'scipy',
-          'pypiwin32'
+          'pywin32'
       ],
       classifiers=[
       'Development Status :: 5 - Production/Stable',

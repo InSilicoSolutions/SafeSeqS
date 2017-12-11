@@ -1,10 +1,9 @@
 SafeSeqS – Safe Sequencing System
 ---------------------------------------------
 
-SafeSeqS Python pipeline for analysis of SafeSeqS DNA sequencing data.   https://www.ncbi.nlm.nih.gov/pubmed/21586637
+Python package for processing of SafeSeqS data (https://www.ncbi.nlm.nih.gov/pubmed/21586637).   The pipeline analyzes multiple
+samples in fastq sequencing files to identify mutations present in a small fraction of DNA templates.
 
-
-The identification of mutations that are present in a small fraction of DNA templates.
 
 Documentation
 -------------
@@ -18,7 +17,7 @@ Use pip to install the SafeSeqS package:
 
 .. code-block:: bash
 
-    $ pip install SafeSeqS
+    $ pip install safeseqs
 
 SafeSeqS depends on several other packages and these will be installed automatically by pip if they
 are not already installed.  
@@ -27,5 +26,5 @@ are not already installed.
 
 * scipy
 * pywin32 (for Windows machines)
-* resource (for Linux machines)
+
 

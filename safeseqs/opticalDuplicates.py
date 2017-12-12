@@ -11,10 +11,12 @@ from safeseqs import utilities
 
 #Read the command line arguments and return them in args
 def get_args():
+
     parser = argparse.ArgumentParser()
     parser.add_argument('-i','--input', help='Reads file.', required=True)
     parser.add_argument('-o', '--output', help='Corrected Family Counts File.', required=True)
     parser.add_argument('-g', '--goodreads', help='File containing compressed read seqs from bad reads. To be used by Optical Dups and UIDstats processes.', required=True)
+    parser.add_argument('-d', '--distance', help='Minimum Distance between records that are NOt optical duplicates.', required=True)
 
     args = parser.parse_args()
     return args    
@@ -76,11 +78,11 @@ def distance(p0, p1):
     if p0[0] == p1[0] and p0[1] == p1[1] and p0[2] == p1[2] and p0[3] == p1[3] and p0[4] == p1[4]: # same instrument, run, flowcell, lane, tile
         return math.sqrt((p0[5] - p1[5])**2 + (p0[6] - p1[6])**2)
     else:
-        return 5001
+        return 100000
     
         
-def cFC(coords):
-    return max(fclusterdata(coords, 5000, criterion = 'distance', metric = distance))
+def cFC(coords, dist_parm):
+    return max(fclusterdata(coords, dist_parm, criterion = 'distance', metric = distance))
     return 
 
 
@@ -97,6 +99,8 @@ def find_optical_duplicates(args):
     logging.info('OPTICAL DUPLICATES PROCESSING STARTED for %s', args.input)
 
     try :
+        args.distance = int(args.distance)
+        
         filename = os.path.split(args.input)[1]
         barcode = filename.split('.')[0]
 
@@ -110,7 +114,7 @@ def find_optical_duplicates(args):
 
             family_good_cnt = len(UID_coords[uid])
             if family_good_cnt > 1:
-                corrected_cnt = cFC(UID_coords[uid])
+                corrected_cnt = cFC(UID_coords[uid], args.distance)
             else:
                 corrected_cnt = family_good_cnt 
             

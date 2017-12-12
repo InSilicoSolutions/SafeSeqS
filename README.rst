@@ -25,7 +25,5 @@ are not already installed.
 **Required packages:**
 
 * scipy
-* pywin32 (for Windows machines)
 
-Note pip is sometimes not able to install pywin32.  If so, please download the executable from https://sourceforge.net/projects/pywin32/files/pywin32/ that
-matches your python version and operating system.  Then re-run pip install safeseqs.
+

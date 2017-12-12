@@ -166,7 +166,7 @@ def load_read_qual_at_chg_pos(args, chgPositions, usableReads):
                     #cycle is the exact position in the read; python strings start at 0 so subtract 1
                     pos = int(chgPositions[seqUID][1][position][1]) -1
                     read_pos_qual = int(ord(r.read_qual[pos]) - args.ascii_adj)
-                    qualScores[r.uid][seqUID][1][position] = aggregate_one(qualScores[r.uid][seqUID][1][position], read_pos_qual)
+                    qualScores[r.uid][seqUID][1][position] = aggregate_one(qualScores[r.uid][seqUID][1][position], read_pos_qual, 1)
     reads_fh.close()
     logging.info('Read Qualities aggregated on Usable UIDs Change Positions')
         
@@ -184,36 +184,38 @@ def aggregate_scores(qualScores, chgPositions, usableReads):
             for position in qualScores[uid][seqUID][1]:
                 change = chgPositions[seqUID][1][position][0] #this will be a tuple with the change details
                 if change not in supMutTab[uid]:
-                    #key is tuple of change details: fam_cnt, primer, align counts -initial (min,max,sum,cnt) AND quality scores
+                    #key is tuple of change details: fam_cnt, primer, align counts -initial min, max, sum (weighted for cnt), cnt AND quality scores
                     supMutTab[uid][change] = [qualScores[uid][seqUID][0], a_cnts[0], \
-                        a_cnts[1], a_cnts[1], a_cnts[1], 1, a_cnts[2], a_cnts[2], a_cnts[2], 1, a_cnts[3], a_cnts[3], a_cnts[3], 1, \
-                        a_cnts[4], a_cnts[4], a_cnts[4], 1, a_cnts[5], a_cnts[5], a_cnts[5], 1] + qualScores[uid][seqUID][1][position]
+                        a_cnts[1], a_cnts[1], (a_cnts[1]*qualScores[uid][seqUID][0]), qualScores[uid][seqUID][0], \
+                        a_cnts[2], a_cnts[2], (a_cnts[2]*qualScores[uid][seqUID][0]), qualScores[uid][seqUID][0], \
+                        a_cnts[3], a_cnts[3], (a_cnts[3]*qualScores[uid][seqUID][0]), qualScores[uid][seqUID][0], \
+                        a_cnts[4], a_cnts[4], (a_cnts[4]*qualScores[uid][seqUID][0]), qualScores[uid][seqUID][0], \
+                        a_cnts[5], a_cnts[5], (a_cnts[5]*qualScores[uid][seqUID][0]), qualScores[uid][seqUID][0]] + qualScores[uid][seqUID][1][position]
                 else:
                     #aggregate this change instance with all others of its type in the UID
                     #add to count for how many reads were in this well_family_read count
                     supMutTab[uid][change][0] += qualScores[uid][seqUID][0]
                     #indel_cnt min, max, sum, cnt: positions 2-5
-                    supMutTab[uid][change][2:6] = aggregate_one(supMutTab[uid][change][2:6], a_cnts[1])
+                    supMutTab[uid][change][2:6] = aggregate_one(supMutTab[uid][change][2:6], a_cnts[1], qualScores[uid][seqUID][0])
                     #mismatch_cnt min, max, sum, cnt: positions 6-9
-                    supMutTab[uid][change][6:10] = aggregate_one(supMutTab[uid][change][6:10], a_cnts[2])
+                    supMutTab[uid][change][6:10] = aggregate_one(supMutTab[uid][change][6:10], a_cnts[2], qualScores[uid][seqUID][0])
                     #ins_bases min, max, sum, cnt: positions 10-13
-                    supMutTab[uid][change][10:14] = aggregate_one(supMutTab[uid][change][10:14], a_cnts[3])
+                    supMutTab[uid][change][10:14] = aggregate_one(supMutTab[uid][change][10:14], a_cnts[3], qualScores[uid][seqUID][0])
                     #del_bases min, max, sum, cnt: positions 14-17
-                    supMutTab[uid][change][14:18] = aggregate_one(supMutTab[uid][change][14:18], a_cnts[4])
+                    supMutTab[uid][change][14:18] = aggregate_one(supMutTab[uid][change][14:18], a_cnts[4], qualScores[uid][seqUID][0])
                     #corr_mismatch_cnt min, max, sum, cnt: positions 18-21
-                    supMutTab[uid][change][18:22] = aggregate_one(supMutTab[uid][change][18:22], a_cnts[5])
+                    supMutTab[uid][change][18:22] = aggregate_one(supMutTab[uid][change][18:22], a_cnts[5], qualScores[uid][seqUID][0])
                     #quality scores min, max, sum, cnt: positions 22-25
                     supMutTab[uid][change][22:26] = aggregate_lists(supMutTab[uid][change][22:26], qualScores[uid][seqUID][1][position])
     return(supMutTab)
 
-
-def aggregate_one(scores, number):
+def aggregate_one(scores, number, cnt):
     if number < scores[0]: #minimum
         scores[0] = number
     if number > scores[1]: #maximum
         scores[1] = number
-    scores[2] += number #sum
-    scores[3] += 1 #count
+    scores[2] += (number * cnt) #sum - weighted for number of records with this value
+    scores[3] += cnt #count
 
     return (scores)
 

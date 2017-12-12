@@ -16,8 +16,7 @@ setup(name='safeseqs',
       license='',
       packages=find_packages(),
       install_requires=[
-          'scipy',
-          'pywin32'
+          'scipy'
       ],
       classifiers=[
       'Development Status :: 5 - Production/Stable',

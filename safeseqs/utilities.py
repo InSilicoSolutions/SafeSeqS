@@ -12,7 +12,7 @@ ReferenceRecord = namedtuple('ReferenceRecord', ['chrom', 'position', 'baseFrom'
 ReadRecord = namedtuple('ReadRecord', ['read_hdr', 'read_seq', 'read_qual', 'barcode', 'bc_quality', 'uid', 'uid_qual'])
 UniqueSeqRecord = namedtuple('UniqueSeqRecord', ['seqUID', 'read_seq', 'read_cnt', 'primerMatch', 'read1_match', 'read1_pos', 'read2_match', 'read2_pos'])
 WellFamilyRecord = namedtuple('WellFamilyRecord', ['seqUID', 'read_seq', 'barcode', 'uid', 'read_cnt', 'primer'])
-UidStatsRecord = namedtuple('UidStatsRecord', ['barcode', 'uid', 'family_cnt', 'family_diversity','family_good_cnt', 'amplicon_diversity', 'primer', 'usable'])
+UidStatsRecord = namedtuple('UidStatsRecord', ['barcode', 'uid', 'family_cnt', 'family_diversity','family_good_cnt', 'amplicon_diversity', 'primer', 'usable', 'orig_cnt', 'orig_fgr_cnt'])
 AlignRecord = namedtuple('AlignRecord', ['seqUID', 'read_seq', 'read_cnt','primer', 'test_seq', 'read1', 'read1_pos', 'read2', 'read2_pos',
                                          'indel_cnt', 'mismatch_cnt', 'ins_bases', 'del_bases', 'snp_cnt', 'cosmic_cnt', 'corr_mismatch_cnt'])
 ChangeRecord = namedtuple('ChangeRecord', ['seqUID', 'chrom', 'position', 'type', 'baseFrom', 'baseTo', 'cycle', 'snp', 'cosmic'])

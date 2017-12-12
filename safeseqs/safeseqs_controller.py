@@ -7,7 +7,6 @@ import sys
 import traceback
 import os
 import multiprocessing
-import platform
 import logging
 
 from safeseqs import utilities
@@ -28,7 +27,6 @@ class StopStep(Exception):
 args = None
 #logfile = ''  #string holding the logfile directory and name
 checkpoints = {} #dictionary holding checkpoints in memory
-fh_limit = 0 #normal Windows limit is 512, Linux is 1024
 barcodemap_list = [] #full list; may include one entry for all "bad" and/or "merge" barcodes if user has requested that they be saved
 barcodes_used = []
 barcodes_not_used = []
@@ -67,14 +65,9 @@ def get_args():
 #  "barcodes_pattern" : "",
 #  "reads_files" : ["fastq file 1 (just file name - must be in Study Data Directory", "fastq file 2", ... ],
 #  "barcodes_files" : ["barcode file 1", "barcode file 2", ...],
-#  "barcodemap" : "well barcode association file"}
-#
-#The settings file contains parameters that are common groupings for a given lab. The file should exist in the data directory.
-#Format of the file is:
-#
-# {"uidLength" :   14,
-#  "load_not_used_bc" : "N", (Optional: valid values are YES, Y, NO, N. It is not case sensitive and defaults to NO. 
-#  "save_merge" : : "N"} (Optional: valid values are YES, Y, NO, N. It is not case sensitive and defaults to NO. 
+#  "barcodemap" : "well barcode association file",
+#  "uidLength" : 14,
+#  "ascii_adj" : 33}
 #
 
 def getSAFESEQSParams():
@@ -104,6 +97,10 @@ def getSAFESEQSParams():
         print('Missing ascii adjustment constant from JSON file')
         missing_parms =True
          
+    if 'uidLength' not in parms:
+        print('Missing uidLength from Settings file')
+        missing_parms =True
+        
     if 'barcodemap' not in parms:
         print('Missing barcodemap from JSON file')
         missing_parms =True
@@ -114,10 +111,6 @@ def getSAFESEQSParams():
 
     parms.update(settings)
     
-    if 'uidLength' not in parms:
-        print('Missing uidLength from Settings file')
-        missing_parms =True
-        
     if 'max_mismatches_for_used_reads' not in parms:
         print('Missing max_mismatches_for_used_reads from Settings file')
         missing_parms =True
@@ -141,6 +134,10 @@ def getSAFESEQSParams():
         parms['perform_opt_dup_removal'] = parms['perform_opt_dup_removal'].lower()
         if parms['perform_opt_dup_removal'] == "yes" or parms['perform_opt_dup_removal'] == "y":
             parms['perform_opt_dup_removal'] = True
+            #if optical duplicate removal will be performed, a distance must be specified
+            if 'opt_dup_distance' not in parms:
+                print('Missing opt_dup_distance from Settings file')
+                missing_parms =True
         else:
             parms['perform_opt_dup_removal'] = False       
 
@@ -194,34 +191,16 @@ def getSAFESEQSParams():
             parms['save_merge'] = True
         else:
             parms['save_merge'] = False
+
+    if 'fh_limit' not in parms:
+        print('Missing fh_limit from Settings file')
+        missing_parms =True
+
           
     if missing_parms:
         raise Exception
         
     return parms
-
- 
-#set the maximum file handle limit possible on the OS. 
-def set_fh_limit():
-    global fh_limit
-    platform_name = platform.system()
-    
-
-    if platform_name.startswith("Windows"):
-        import win32file
-        fh_limit = win32file._getmaxstdio()
-        win32file._setmaxstdio(2048)
-        fh_limit = win32file._getmaxstdio()
-    elif platform_name.startswith("Linux"):
-        import resource
-        fh_limit, fh_max = resource.getrlimit(resource.RLIMIT_NOFILE)
-        resource.setrlimit(resource.RLIMIT_NOFILE, (2048, fh_max))
-        fh_limit, fh_max = resource.getrlimit(resource.RLIMIT_NOFILE)
-        
-    #Return a smaller number for the controller to work with to allow for additional open file handles.        
-    fh_limit = fh_limit-20
-        
-    return (fh_limit)
 
 
 #Write the step and data set name to the checkpoint file
@@ -304,7 +283,7 @@ def split_inputs(parms):
     
     #load the barcode maplist into memory. this list will be used by split and later steps
     load_barcodes(parms)    
-    logging.info('File Handle Limit: %i' % fh_limit)  
+    logging.info('File Handle Limit: %i' % parms['fh_limit'])  
     logging.info('Number of Split Barcodes files needed: %i' % len(barcodemap_list))  
     
     if skip_step('split') or is_done('split', 'all'):
@@ -332,7 +311,7 @@ def split_inputs(parms):
         #clear the dictionary of open barcode files
         barcode_files.clear()
             
-        start = start + fh_limit
+        start = start + parms['fh_limit']
         first_pass = False
 
     write_split_stats(parms)
@@ -382,7 +361,7 @@ def open_barcode_files(parms, start):
     logging.debug('open_barcode_files')         
     global barcode_files
     
-    end = start + fh_limit
+    end = start + parms['fh_limit']
     if end > len(barcodemap_list):
         end = len(barcodemap_list)
         
@@ -759,7 +738,8 @@ def remove_optical_duplicates(parms):
 
                 subprocess_args = argparse.Namespace(input=input_file, 
                                     goodreads=gr_file,
-                                    output=cFc_file)
+                                    output=cFc_file,
+                                    distance = parms['opt_dup_distance'])
                               
                 p = multiprocessing.Process(target=opticalDuplicates.find_optical_duplicates, name=barcodemap_list[current_file], args=(subprocess_args,))
                 p.start()
@@ -839,6 +819,7 @@ def run_uidstats(parms):
                 else:
                     subprocess_args = argparse.Namespace(input=input_file, 
                                         goodReads=gr_file, 
+                                        cFc=None,
                                         output=us_file, 
                                         max_mismatches_allowed = parms['max_mismatches_for_used_reads'],
                                         max_indels_allowed = parms['max_indels_for_used_reads'],
@@ -1098,7 +1079,7 @@ def main():
     try :
         get_args()
         parms = getSAFESEQSParams()
-        fh_limit = set_fh_limit()
+        parms['fh_limit'] = int(parms['fh_limit'])
     
         #create directory for analysis results
         parms['resultsDir'] = os.path.join(args.directory, args.runname)

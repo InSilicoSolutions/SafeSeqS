@@ -67,6 +67,9 @@ def calculate_uid_stats(args):
                 if UIDs[uid][seqUID][1] != "No Match" and UIDs[uid][seqUID][1] not in primers:
                     primers.append(UIDs[uid][seqUID][1])
                     
+            #keep the original Family Read Count and Family Good Read Count before checking for corrected counts
+            orig_good_cnt = family_good_cnt
+            orig_cnt = family_cnt
             #if this UID has a corrected family count, use that number on its UIDstat record
             #also adjust the total reads count for the family by the number of optical duplicates found
             if uid in cFc:
@@ -81,7 +84,7 @@ def calculate_uid_stats(args):
                 elif family_good_cnt >= args.min_good_reads and (family_good_cnt/family_cnt) > args.min_frac_good_reads:
                     usable = 1
             
-            output_fh.write('\t'.join([barcode, uid, str(family_cnt), str(family_diversity), str(family_good_cnt), str(amplicon_diversity), amplicon, str(usable)]) + '\n')
+            output_fh.write('\t'.join([barcode, uid, str(family_cnt), str(family_diversity), str(family_good_cnt), str(amplicon_diversity), amplicon, str(usable), str(orig_cnt), str(orig_good_cnt)]) + '\n')
      
         output_fh.close()
 

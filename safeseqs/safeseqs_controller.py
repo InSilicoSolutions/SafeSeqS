@@ -105,7 +105,7 @@ def getSAFESEQSParams():
         print('Missing barcodemap from JSON file')
         missing_parms =True
          
-    settings_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.path.pardir, 'data', args.settings) 
+    settings_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', args.settings) 
     with open(settings_file) as json_file:    
         settings = json.load(json_file)
 
@@ -615,7 +615,7 @@ def run_align_uniques(parms):
 
     #load a subset of COSMICs for the run, using the runs's primer set to focus on specific positions for specific chromosomes               
     primerset_file = os.path.join(args.directory, 'Primers.txt')
-    data_input = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.path.pardir, 'data', "COSMIC.txt")
+    data_input = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', "COSMIC.txt")
     subset = os.path.join(parms['resultsDir'], "COSMIC.txt")
     if os.path.isfile(data_input):
         utilities.condense_ref_data(primerset_file, data_input, subset)
@@ -623,12 +623,12 @@ def run_align_uniques(parms):
         logging.warn('Reference file for COSMICs not found in data directory')
               
     #load a subset of SNPs for the run, using the run's primer set to focus on specific positions for specific chromosomes               
-    data_input = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.path.pardir, 'data', "SNP.txt")
-    subset = os.path.join(parms['resultsDir'], "SNP.txt")              
+    data_input = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', "dbSNP.txt")
+    subset = os.path.join(parms['resultsDir'], "dbSNP.txt")              
     if os.path.isfile(data_input):
         utilities.condense_ref_data(primerset_file, data_input, subset)
     else:
-        logging.warn('Reference file for SNPs not found in data directory')
+        logging.warn('Reference file for dbSNPs not found in data directory')
     
 
     current_file = 0

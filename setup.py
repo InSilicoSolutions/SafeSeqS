@@ -15,6 +15,7 @@ setup(name='safeseqs',
       author_email='kinzlke@jhmi.edu',
       license='',
       packages=find_packages(),
+      include_package_data=True,
       install_requires=[
           'scipy'
       ],

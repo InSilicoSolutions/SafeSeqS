@@ -79,10 +79,10 @@ def condense_ref_data(primer_file, db_file, subset_file):
     refDB_fh = open(db_file,'r')
     refSubset_fh = open(subset_file,'w')
         
-    #write all ref items (COSMICs or SNPs) for chroms being used in the run whose position is within primer start and end position. 
+    #write all ref items (COSMICs or dbSNPs) for chroms being used in the run whose position is within primer start and end position. 
     for line in refDB_fh:
         l = line.strip().split('\t')
-        #There must be a value in the SNP or Somatic Count column
+        #There must be a value in the dbSNP or Somatic Count column
         if len(l) >= 5 and l[4] != '':
             #be sure to use lowercase chrom and uppercase Base From and To
             l[0] = l[0].lower()
@@ -101,7 +101,7 @@ def condense_ref_data(primer_file, db_file, subset_file):
     return
 
 
-#load chromosome positions from primer file into dictionary for use in selection of SNPs and COSMIC
+#load chromosome positions from primer file into dictionary for use in selection of dbSNPs and COSMIC
 def load_chrom_pos(filename):
     chromRefs = {}
         
@@ -124,7 +124,7 @@ def load_chrom_pos(filename):
 def load_references(filename, ref_type):
     references = {}
 
-    if os.path.isfile(filename):
+    if os.path.isfile(os.path.join(os.path.dirname(filename), os.path.pardir, ref_type + ".txt")):
         
         #extract the runname directory from the filename, look for the COSMIC subset file there
         input_fh = open(os.path.join(os.path.dirname(filename), os.path.pardir, ref_type + ".txt"),'r')
@@ -133,7 +133,7 @@ def load_references(filename, ref_type):
             #For each line, create a data record with the value of the line (tab separated)
             r = ReferenceRecord(*line.strip().split('\t'))
                 
-            #Store the reference record (SNP or COSMIC) in the dictionary.
+            #Store the reference record (dbSNP or COSMIC) in the dictionary.
             if r.chrom in references:
                 references[r.chrom].append((r))
             else:

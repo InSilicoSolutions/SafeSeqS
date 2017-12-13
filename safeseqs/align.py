@@ -154,7 +154,7 @@ def perform_align(args):
                                 if i > pos:
                                     cycle = cycle - indel_len #adjust by +/- length of indel
                         
-                            #check for COSMIC, then SNP
+                            #check for COSMIC, then dbSNP
                             if not cosmics:
                                 #load cosmics into dictionary
                                 cosmics = utilities.load_references(args.output, 'COSMIC')
@@ -165,14 +165,14 @@ def perform_align(args):
                                         cosmic_fnd = r.value
                                         cosmic_cnt += 1
                                         break
-                            #if no COSMIC, then check for SNP
+                            #if no COSMIC, then check for dbSNP
                             if cosmic_fnd == '0':
                                 if not snps:
-                                    #load snps into dictionary
-                                    snps = utilities.load_references(args.output, 'SNP')
+                                    #load dbsnps into dictionary
+                                    snps = utilities.load_references(args.output, 'dbSNP')
     
                                 if p.chrom in snps:
-                                    for r in snps[p.chrom]: #go through each entry with SNPs on this chrom
+                                    for r in snps[p.chrom]: #go through each entry with dbSNPs on this chrom
                                         if str(chrom_pos) == r.position and p.ampSeq[i] == r.baseFrom and test_seq[i] == r.baseTo:
                                             snp_fnd = r.value
                                             snp_cnt += 1

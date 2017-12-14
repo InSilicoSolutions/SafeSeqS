@@ -853,9 +853,9 @@ def run_supermutants(parms):
     print('Super Mutant Started.')
     
     #make sure the /mutants directory exists in the results directory
-    mutant_directory = os.path.join(parms['resultsDir'], "mutants")
-    if not os.path.isdir(mutant_directory):
-        os.makedirs(mutant_directory)
+    mutTab_directory = os.path.join(parms['resultsDir'], "mutantTabs")
+    if not os.path.isdir(mutTab_directory):
+        os.makedirs(mutTab_directory)
 
     current_file = 0
     workers=[]
@@ -892,7 +892,7 @@ def run_supermutants(parms):
                 align_file = os.path.join(parms['resultsDir'], "align", barcodemap_list[current_file]+'.align')
                 change_file = os.path.join(parms['resultsDir'], "changes", barcodemap_list[current_file]+'.changes')
                 us_file = os.path.join(parms['resultsDir'], "UIDstats", barcodemap_list[current_file]+'.UIDstats')
-                mutant_file = os.path.join(mutant_directory, barcodemap_list[current_file]+'.smt')
+                mutant_file = os.path.join(mutTab_directory, barcodemap_list[current_file]+'.smt')
                 
                 mutant_args = argparse.Namespace(reads=reads_file, 
                                 aligns=align_file, 
@@ -929,9 +929,9 @@ def run_well_supermutants(parms):
     print('Well Super Mutant Started.')
     
     #make sure the /mutants directory exists in the results directory
-    mutant_directory = os.path.join(parms['resultsDir'], "mutants")
-    if not os.path.isdir(mutant_directory):
-        os.makedirs(mutant_directory)
+    mutTab_directory = os.path.join(parms['resultsDir'], "mutantTabs")
+    if not os.path.isdir(mutTab_directory):
+        os.makedirs(mutTab_directory)
 
     current_file = 0
     workers=[]
@@ -963,10 +963,10 @@ def run_well_supermutants(parms):
             
             #There is work to do, see if we are allowed to start another worker
             if len(multiprocessing.active_children()) < args.workers:
-                smt_file = os.path.join(parms['resultsDir'], "mutants", barcodemap_list[current_file]+'.smt')
+                smt_file = os.path.join(mutTab_directory, barcodemap_list[current_file]+'.smt')
                 us_file = os.path.join(parms['resultsDir'], "UIDstats", barcodemap_list[current_file]+'.UIDstats')
-                wellAmp_file = os.path.join(mutant_directory, barcodemap_list[current_file]+'.wat')
-                mutant_file = os.path.join(mutant_directory, barcodemap_list[current_file]+'.wsmt')
+                wellAmp_file = os.path.join(mutTab_directory, barcodemap_list[current_file]+'.wat')
+                mutant_file = os.path.join(mutTab_directory, barcodemap_list[current_file]+'.wsmt')
                 barcodemap_file = os.path.join(args.directory, parms['barcodemap'])
                 
                 mutant_args = argparse.Namespace(supMutTabs=smt_file, 
@@ -1003,9 +1003,9 @@ def run_sample_supermutants(parms):
     print('Sample Super Mutant Started.')
     
     #make sure the /mutants directory exists in the results directory
-    mutant_directory = os.path.join(parms['resultsDir'], "mutants")
-    if not os.path.isdir(mutant_directory):
-        os.makedirs(mutant_directory)
+    sampleMut_directory = os.path.join(parms['resultsDir'], "superMutants")
+    if not os.path.isdir(sampleMut_directory):
+        os.makedirs(sampleMut_directory)
         
     #gather the list of templates (samples) in this run
     sample_list = []
@@ -1056,7 +1056,7 @@ def run_sample_supermutants(parms):
             if len(multiprocessing.active_children()) < args.workers:
                 
                 sample = sample_list[current_sample]
-                sample_file = os.path.join(mutant_directory, sample_list[current_sample].replace(" ", "_")+'.ssmt')
+                sample_file = os.path.join(sampleMut_directory, sample_list[current_sample].replace(" ", "_")+'.ssmt')
                 
                 mutant_args = argparse.Namespace(output=sample_file,  
                                         barcodeMap = barcodemap_file,

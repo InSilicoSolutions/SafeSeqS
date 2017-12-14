@@ -66,7 +66,7 @@ def load_primers(args, barcodes):
     
     #for all barcodes in this sample, aggregate the the WellAmpTab file info on primer
     for barcode in barcodes:
-        wat_filename = os.path.join(directory, barcode + ".wat")
+        wat_filename = os.path.join(directory, os.pardir, "mutantTabs", barcode + ".wat")
           
         wat_fh = open(wat_filename,'r')
         for line in wat_fh:
@@ -90,7 +90,7 @@ def load_chgs_by_sample(args, barcodes, ampTabs):
     directory = os.path.dirname(args.output)
     
     for barcode in barcodes:
-        wsmt_filename = os.path.join(directory, barcode + ".wsmt")
+        wsmt_filename = os.path.join(directory, os.pardir, "mutantTabs", barcode + ".wsmt")
           
         wsmt_fh = open(wsmt_filename,'r')
         for line in wsmt_fh:
@@ -203,6 +203,26 @@ def aggregate_lists(existing, new):
 def create_sample_supMut_tab_file(args, sample_details, sampleSupMutTabs, ampTabs, wells_per_sample):
     #assemble collected tabulation info into format for output file
     output_fh = open(args.output,'w')
+    #write a header line
+    output_fh.write('\t'.join(['Template', 'Purpose', 'GEsWellOrTotalULUsed', 'WellAmpMatchName', 'PrimerAmpMatchName', 'SampleWells', \
+                               'SampleWellsPositiveForAmplimer', 'SumTotalUIDsForAmplimer', 'SumGoodReadsForAmplimer', 'MinTotalUIDsForAmplimerPerWell', \
+                               'AverageTotalUIDsForAmplimerPerWell', 'MaxTotalUIDsForAmplimerPerWell', 'MinSumGoodReadsForAmplimerPerWell', 'AverageSumGoodReadsForAmplimerPerWell', \
+                               'MaxSumGoodReadsForAmplimerPerWell', 'Chrom', 'Position', 'MutType', 'BaseFrom', 'BaseTo', 'MutantWellCount', \
+                               'MutantDistinctUidCount', 'SumMutReadCounts', 'SumFamilyGoodReadCountFromMutantFamilies', 'MinMutantDistinctUidCountPerWell', \
+                               'AverageMutantDistinctUidCountPerWell', 'MaxMutantDistinctUidCountPerWell', 'MinMutCount', 'AverageMutCount', 'MaxMutCount', \
+                               'MinGoodReadCountInMutantWells', 'AverageFamilyGoodReadCountInMutantWells', 'MaxFamilyGoodReadCountInMutantWells', \
+                               'MinMismatchCountInMutantReads', 'AverageMismatchCountInMutantReads', 'MaxMismatchCountInMutantReads', \
+                               'MinCorrectedMismatchCountInMutantReads', 'AverageCorrectedMismatchCountInMutantReads', 'MaxCorrectedMismatchCountInMutantReads', \
+                               'MinIndelCountInMutantReads', 'AverageIndelCountInMutantReadsInMutantReads', 'MaxIndelCountInMutantReadsInMutantReads', \
+                               'MinInsertedBasesInMutantReads', 'AverageInsertedBasesInMutantReads', 'MaxInsertedBasesInMutantReads', \
+                               'MinDeletedBasesInMutantReads', 'AverageDeletedBasesInMutantReads', 'MaxDeletedBasesInMutantReads', \
+                               'MinQualityScoreForMutation', 'AverageQualityScoreForMutation', 'MaxQualityScoreForMutation', \
+                               'Min%MutantByAllReadsByWellInMutantWells', 'Average%MutantByAllReadsByWellInMutantWells', 'Max%MutantByAllReadsByWellInMutantWells', \
+                               'Min%MutantByUidFAmiliesByWellInMutantWells', 'Average%MutantByUidFAmiliesByWellInMutantWells', 'Max%MutantByUidFAmiliesByWellInMutantWells', \
+                               'MinSumGoodReadsByWellInMutantWells', 'AverageSumGoodReadsByWellInMutantWells', 'MaxSumGoodReadsByWellInMutantWells', \
+                               'MinTotalUIDsByWellInMutantWells', 'AverageTotalUIDsByWellInMutantWells', 'MaxTotalUIDsByWellInMutantWells', \
+                               'SumGoodReadsFromMutantWells', 'TotalUIDsFromMutantWells', '%WellsWithMutation', '%MutantByAllReads', '%MutantByUidFAmilies', '%BackgroundRate']) + '\n')
+
     sample_details = list(sample_details)
         
     for change in sampleSupMutTabs:

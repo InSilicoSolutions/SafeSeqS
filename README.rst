@@ -22,8 +22,5 @@ Use pip to install the SafeSeqS package:
 SafeSeqS depends on several other packages and these will be installed automatically by pip if they
 are not already installed.  
 
-**Required packages:**
-
-* scipy
 
 

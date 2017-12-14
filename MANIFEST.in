@@ -1,2 +1,3 @@
 include README.rst
 include safeseqs/data/*.*
+include safeseqs/example/*.*

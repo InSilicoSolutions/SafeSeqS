@@ -1,0 +1,2 @@
+BarcodeNumber	Barcode	WBCPlateNumber	Template	Purpose	GEsWellOrTotalULUsed	MutOrTotalGEsWell	AmpMatchName	Row	Col
+179	TCAATG	5700-2	NL WBCA 1538	PlasmaSeqS	3080	5	PlasmaSeq_ALL_080816	G	7

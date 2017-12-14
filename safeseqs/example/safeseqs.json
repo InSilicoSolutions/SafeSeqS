@@ -1,0 +1,7 @@
+{"reads_pattern" :   "R1",
+ "barcodes_pattern" : "I1",
+ "reads_files" :   [""],
+ "barcodes_files" : [""],
+ "uidLength" : 14,
+ "barcodemap" : "exampleBarcodeMap.txt",
+ "ascii_adj" : 33}

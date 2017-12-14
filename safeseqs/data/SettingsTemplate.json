@@ -5,7 +5,7 @@
  "max_mismatches_for_used_reads" : 3,
  "max_indels_for_used_reads" : 1,
  "mark_UIDs_with_Ns_UnUsable" : "yes",
- "perform_opt_dup_removal" : "no",
+ "perform_opt_dup_removal" : "yes",
  "opt_dup_distance" : 5000,
  "max_amp_per_UID_family" : 1,
  "min_good_reads_usable_family" : 2,

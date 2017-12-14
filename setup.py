@@ -7,7 +7,7 @@ def readme():
 
 
 setup(name='safeseqs',
-      version='0.85',
+      version='0.86',
       description='Safe-SequencingSystem (SafeSeqs) data processing pipeline',
       long_description=readme(),
       url='https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3111315/',

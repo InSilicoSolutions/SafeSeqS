@@ -42,7 +42,7 @@ def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('-d', '--directory', help='Directory Containing Study Fastq Files.', required=True)
     parser.add_argument('-r', '--runname', help='Run Directory will be created in directory with study files.', required=True)
-    parser.add_argument('-sf', '--settings', help='Settings file with runtime parameters. File must exist in the data directory', required=True)
+    parser.add_argument('-sf', '--settings', help='Settings file with runtime parameters. File must exist in the data directory', required=False)
     parser.add_argument('-w', '--workers', help='Number of concurrent worker processes to run', type=int, default=1, required=False)
     parser.add_argument('-s','--stepname', help='Start Step to begin Processing', required=False)
     parser.add_argument('-e','--endstep', help='Step Before which to stop Processing', required=False)
@@ -104,7 +104,11 @@ def getSAFESEQSParams():
     if 'barcodemap' not in parms:
         print('Missing barcodemap from JSON file')
         missing_parms =True
-         
+
+    #default settings file name if no optional override provided, file must be in project data directory
+    if args.settings is None:
+        args.settings = 'settings.json'   
+            
     settings_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', args.settings) 
     with open(settings_file) as json_file:    
         settings = json.load(json_file)
@@ -1104,6 +1108,7 @@ def main():
         
         logging.info('PROCESSING STARTED')
         print('PROCESSING STARTED')
+        logging.info('Settings file: %s', args.settings)
         
         #split the merged inputs into separate files for each barcode
         split_inputs(parms)

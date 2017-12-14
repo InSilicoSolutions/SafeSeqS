@@ -43,6 +43,10 @@ def load_primers(filename):
         #For each line, create a data record with the value of the line (tab separated)
         p = PrimerRecord(*line.strip().split('\t'))
         
+        #skip header line
+        if not p.hg19_start.isdigit():
+            continue
+        
         #ensure read1 sequence is UPPER case
         temp_read1 = p.read1.upper()
         
@@ -154,8 +158,8 @@ def get_barcode_details(filename, barcode):
     GEs = 'NULL'
     
     if os.path.isfile(filename):
-        #extract the study directory from the filename, look for the BarcodeMap file there
-        input_fh = open(os.path.join(os.path.dirname(filename), os.path.pardir, os.path.pardir,  "BarcodeMap.txt"),'r')
+
+        input_fh = open(filename,'r')
         
         for line in input_fh:
             #For each line, create a list of the fields

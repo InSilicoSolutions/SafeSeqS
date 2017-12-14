@@ -11,6 +11,7 @@ def get_args():
     parser.add_argument('-u','--uidStats', help='The UID stats file name', required=True)
     parser.add_argument('-s', '--supMutTabs', help='The Super Mutant Tabulation file name', required=True)
     parser.add_argument('-wa', '--wellAmpTabs', help='The Well Amplicon Tabulation file name', required=True)
+    parser.add_argument('-b', '--barcodeMap', help='The barcode map file name', required=True)
     parser.add_argument('-o', '--output', help='The Well SuperMutant Tabulation file name', required=True)
     parser.add_argument('-sh', '--sm_homogeneity', help='SuperMutant Percent Homogeneity parameter.', required=True)
     parser.add_argument('-ir', '--indel_rate', help='Default Background Indel Rate (Percent - Used for all Reports)', required=True)
@@ -165,7 +166,7 @@ def create_well_supMut_tab_file(args, barcode, wellSupMutTabs, ampTabs):
     output_fh = open(args.output,'w')
     #If there are potential super mutants to write, load the reference data from files
     if len(wellSupMutTabs) > 0:
-        barcodeNum, mapBarcode, template, purpose, GEs = utilities.get_barcode_details(args.output, barcode)
+        barcodeNum, mapBarcode, template, purpose, GEs = utilities.get_barcode_details(args.barcodeMap, barcode)
         
     for change in wellSupMutTabs:
         change_details = [change[0], barcode, change[1], change[2], change[3], change[4], change[5]]

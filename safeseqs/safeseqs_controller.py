@@ -967,12 +967,16 @@ def run_well_supermutants(parms):
                 us_file = os.path.join(parms['resultsDir'], "UIDstats", barcodemap_list[current_file]+'.UIDstats')
                 wellAmp_file = os.path.join(mutant_directory, barcodemap_list[current_file]+'.wat')
                 mutant_file = os.path.join(mutant_directory, barcodemap_list[current_file]+'.wsmt')
+                barcodemap_file = os.path.join(args.directory, parms['barcodemap'])
                 
-                mutant_args = argparse.Namespace(supMutTabs=smt_file, uidStats=us_file,
-                                       output=mutant_file, wellAmpTabs=wellAmp_file, 
-                                       sm_homogeneity = parms['super_mut_perc_homegeneity'],
-                                       indel_rate = parms['default_indel_rate'],
-                                       sbs_rate = parms['default_sbs_rate'])
+                mutant_args = argparse.Namespace(supMutTabs=smt_file, 
+                                    uidStats=us_file,
+                                    output=mutant_file,
+                                    wellAmpTabs=wellAmp_file, 
+                                    barcodeMap=barcodemap_file, 
+                                    sm_homogeneity = parms['super_mut_perc_homegeneity'],
+                                    indel_rate = parms['default_indel_rate'],
+                                    sbs_rate = parms['default_sbs_rate'])
                               
                 p = multiprocessing.Process(target=well_super_muts.perform_well_sm_tabs, name=barcodemap_list[current_file], args=(mutant_args,))
                 p.start()

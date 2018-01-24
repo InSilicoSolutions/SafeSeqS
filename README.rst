@@ -1,4 +1,4 @@
-SafeSeqS – Safe Sequencing System
+ï»¿SafeSeqS - Safe Sequencing System
 ---------------------------------------------
 
 Python package for processing of SafeSeqS data (https://www.ncbi.nlm.nih.gov/pubmed/21586637).   The pipeline analyzes multiple

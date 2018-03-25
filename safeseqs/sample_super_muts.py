@@ -93,6 +93,9 @@ def load_chgs_by_sample(args, barcodes, ampTabs):
         wsmt_filename = os.path.join(directory, os.pardir, "mutantTabs", barcode + ".wsmt")
           
         wsmt_fh = open(wsmt_filename,'r')
+
+        hdr=wsmt_fh.readline()
+        #throw away the header in line one
         for line in wsmt_fh:
             t = line.strip().split('\t')
             #key is tuple of change details: result is a list of stats

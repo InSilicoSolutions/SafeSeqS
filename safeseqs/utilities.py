@@ -151,32 +151,22 @@ def load_references(filename, ref_type):
 
 
 def get_barcode_details(filename, barcode):
-    num = 'NULL'
-    mapBarcode = 'NULL'
-    template = 'NULL'
-    purpose = 'NULL'
-    GEs = 'NULL'
-    
+
     if os.path.isfile(filename):
 
         input_fh = open(filename,'r')
         
         for line in input_fh:
-            #For each line, create a list of the fields
-            b = line.strip().split('\t')
+            #check to see if this is the requested barcode
+            b = BarcodeMapRecord(*line.strip().split('\t'))
                 
-            #Store the barcode info in the dictionary.
-            if b[1] == barcode:
-                num = b[0]
-                mapBarcode = b[1]
-                template = b[3]
-                purpose = b[4]
-                GEs = b[5]
+            #Stop when we find the requested barcode
+            if b.barcode == barcode:
                 break
                          
         input_fh.close()
         
-    return (num, mapBarcode, template, purpose, GEs)
+    return (b)
 
 
 #reverse the order of the string and substitute the opposite nucleotide
@@ -212,3 +202,85 @@ def load_good_reads(filename):
     return(good_reads)
 
 
+def get_filename(sample):
+    #create a valid filename from the sample name 
+
+    #replace characters that are illegal in filenames with underscore
+    for ch in ['!','@','#','$','%','^','&','*','(',')','+','=','{','}','[',']','\\','|',':',';','"', "'", '<','>',',','.','/','?','~','`',' ']:
+        if ch in sample:
+            sample = sample.replace(ch,"_")
+
+    #remove any leading and trailing '_' underscores
+    filename = sample.strip('_')
+
+    return(filename)
+
+def aggregate_files(input_dir, extension, output):
+    report_dir = os.path.join(input_dir, os.path.pardir, "reports")
+    #if the report directory does not exist, create it
+    if not os.path.isdir(report_dir):
+        os.makedirs(report_dir)
+
+    report_fh = open(os.path.join(report_dir, output),'w')
+    hdr_written=False
+    
+    file_list = os.listdir(input_dir)
+    # loop through the files with proper extension in the specified directory
+    for filename in file_list:
+        if filename.endswith(extension):
+            ind_fh = open(os.path.join(input_dir, filename),'r')
+            #the first line of the file is the header, only write it once to the report.
+            hdr=ind_fh.readline()
+            if not hdr_written:
+                report_fh.write(hdr)
+                hdr_written=True
+            
+            #loop through the remaining lines and write them to the report file
+            for line in ind_fh:
+                report_fh.write(line)
+            ind_fh.close()    
+    report_fh.close()    
+
+
+def aggregate_WATs(parms, input_dir, extension, output):
+    report_dir = os.path.join(input_dir, os.path.pardir, "reports")
+    #if the report directory does not exist, create it
+    if not os.path.isdir(report_dir):
+        os.makedirs(report_dir)
+
+    report_fh = open(os.path.join(report_dir, output),'w')
+    #write a header line
+    report_fh.write('\t'.join(['BarcodeNumber', 'WBCPlateNumber', 'Template', 'Purpose', 'GEsWellOrTotalULUsed', 'MutOrTotalGEsWell', \
+                               'Row', 'Col', 'PrimerSetName', 'AmpMatchName', 'TotalUIDs','SumGoodReads']) + '\n')
+                                            
+    primers = load_primers(os.path.join(input_dir, os.path.pardir, os.path.pardir, parms['primerfile']))
+
+    file_list = os.listdir(input_dir)
+    # loop through the files with proper extension in the specified directory
+    for filename in file_list:
+        if filename.endswith(extension):
+            ind_fh = open(os.path.join(input_dir, filename),'r')
+            #reset the dictionary holding the well amp tabs
+            wats = {}
+            for line in ind_fh:
+                #format the line as a WAT and store it keyed on the primer
+                #WellAmpTabRecord  ['barcode', 'primer', 'total_UIDs', 'sumGoodReads'])
+                w = WellAmpTabRecord(*line.strip().split('\t'))
+                wats[w.primer] = w
+            ind_fh.close()    
+
+            #write report lines whether WATs were found for barcode or not
+            #barcode will always be the first part of the WATS filename, get its details from barcodeMap file
+            b = get_barcode_details(os.path.join(input_dir, os.path.pardir, os.path.pardir, parms['barcodemap']), filename.split('.')[0])
+            #BarcodeMapRecord ['barcodeNumber', 'barcode', 'wbcPlateNumber', 'template', 'purpose', 'gEsWellOrTotalULUsed', 'mutOrTotalGEsWell', 'ampMatchName', 'row', 'col'])
+            barcodedetails = [b.barcodeNumber, b.wbcPlateNumber, b.template, b.purpose, b.gEsWellOrTotalULUsed, b.mutOrTotalGEsWell, b.row, b.col, b.ampMatchName]
+
+            #loop through all primers in study. writing totals for each primer.
+            for primer in primers:
+                if primer in wats:
+                    #WellAmpTabRecord  ['barcode', 'primer', 'total_UIDs', 'sumGoodReads'])
+                    primer_counts = [primer, wats[primer].total_UIDs, wats[primer].sumGoodReads]
+                else:
+                    primer_counts = [primer, ' ', ' ']
+                report_fh.write('\t'.join(barcodedetails + primer_counts) + '\n')
+    report_fh.close()    

@@ -164,9 +164,27 @@ def aggregate_lists(existing, new):
 def create_well_supMut_tab_file(args, barcode, wellSupMutTabs, ampTabs):
     #assemble collected tabulation info into format for output file
     output_fh = open(args.output,'w')
+    #write a header line
+    output_fh.write('\t'.join(['BarcodeNumber','Barcode','Template', 'Purpose', 'GEsWellOrTotalULUsed', 'ampMatchName', 'IndexSequence', \
+                               'Chrom', 'Position', 'MutType', 'BaseFrom', 'BaseTo',  \
+                               'MutantDistinctUidCount', 'SumMutReadCounts', 'SumFamilyGoodReadCountFromMutantFamilies',  \
+                               'MinMutCount', 'AverageMutCount', 'MaxMutCount', \
+                               'MinFamilyGoodReadCount', 'AverageFamilyGoodReadCount', 'MaxFamilyGoodReadCount', \
+                               'MinMismatchCount', 'AverageMismatchCount', 'MaxMismatchCount', \
+                               'MinCorrectedMismatchCount', 'AverageCorrectedMismatchCount', 'MaxCorrectedMismatchCount', \
+                               'MinIndelCount', 'AverageIndelCount', 'MaxIndelCount', \
+                               'MinInsertedBases', 'AverageInsertedBases', 'MaxInsertedBases', \
+                               'MinDeletedBases', 'AverageDeletedBases', 'MaxDeletedBases', \
+                               'MinQualityScore', 'AverageQualityScore', 'MaxQualityScore', \
+                               'SumGoodReads', 'TotalUIDs', '%MutantByAllReads', '%MutantByUidFAmilies', '%BackgroundRate']) + '\n')
+
     #If there are potential super mutants to write, load the reference data from files
     if len(wellSupMutTabs) > 0:
-        barcodeNum, mapBarcode, template, purpose, GEs = utilities.get_barcode_details(args.barcodeMap, barcode)
+        #get the barcode map record for the barcode.
+        #BarcodeMapRecord ['barcodeNumber', 'barcode', 'wbcPlateNumber', 'template', 'purpose', 'gEsWellOrTotalULUsed', 'mutOrTotalGEsWell', 'ampMatchName', 'row', 'col'])
+
+        b = utilities.get_barcode_details(args.barcodeMap, barcode)
+        barcode_details = [b.barcodeNumber, b.barcode, b.template, b.purpose, b.gEsWellOrTotalULUsed]
         
     for change in wellSupMutTabs:
         change_details = [change[0], barcode, change[1], change[2], change[3], change[4], change[5]]
@@ -207,7 +225,7 @@ def create_well_supMut_tab_file(args, barcode, wellSupMutTabs, ampTabs):
             background_rate = str(args.indel_rate)
 
 
-        output_fh.write('\t'.join([barcodeNum, mapBarcode, template, purpose, GEs] + change_details  + \
+        output_fh.write('\t'.join(barcode_details + change_details  + \
                                   [str(wellSupMutTabs[change][0]), str(wellSupMutTabs[change][2]), str(wellSupMutTabs[change][6])] +\
                                   mut_cnts + fam_good_cnts + mismatch_cnts + corr_mismatch_cnts + \
                                   indel_cnts + ins_bases + del_bases + quality_scores +\

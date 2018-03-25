@@ -25,14 +25,16 @@ class StopStep(Exception):
 
 #globals
 args = None
-#logfile = ''  #string holding the logfile directory and name
+data_level = 25 # level for data level logging
+
 checkpoints = {} #dictionary holding checkpoints in memory
 barcodemap_list = [] #full list; may include one entry for all "bad" and/or "merge" barcodes if user has requested that they be saved
 barcodes_used = []
 barcodes_not_used = []
+
 total_reads = 0    
-reads_with_bc_not_used = []
-reads_with_bc_not_found = []
+reads_with_bc_not_used = 0
+reads_with_bad_bc = 0
 barcode_files = {} #dict of barcode files open with file handles for the split process. 
 
     
@@ -66,6 +68,7 @@ def get_args():
 #  "reads_files" : ["fastq file 1 (just file name - must be in Study Data Directory", "fastq file 2", ... ],
 #  "barcodes_files" : ["barcode file 1", "barcode file 2", ...],
 #  "barcodemap" : "well barcode association file",
+#  "primerfile" : "list of primers used in study",
 #  "uidLength" : 14,
 #  "ascii_adj" : 33}
 #
@@ -104,6 +107,11 @@ def getSAFESEQSParams():
     if 'barcodemap' not in parms:
         print('Missing barcodemap from JSON file')
         missing_parms =True
+
+    if 'primerfile' not in parms:
+        print('Missing primerfile from JSON file')
+        missing_parms =True
+
 
     #default settings file name if no optional override provided, file must be in project data directory
     if args.settings is None:
@@ -282,7 +290,7 @@ def split_inputs(parms):
     logging.debug('split_inputs')
     global barcode_files
     global total_reads
-    global reads_with_bc_not_found
+    global reads_with_bad_bc
     global reads_with_bc_not_used
     
     #load the barcode maplist into memory. this list will be used by split and later steps
@@ -332,7 +340,9 @@ def load_barcodes(parms):
     global barcodemap_list
     global barcodes_used
     global barcodes_not_used
-
+    global bc1s
+    global bc2s
+    
     #if parameter is set, put the "bad" item first on list so it will always exist in the first pass through the file handles    
     if parms['load_bad_bc']:
         barcodemap_list.append('bad')
@@ -380,8 +390,8 @@ def loop_pairs(parms, first_pass):
     logging.debug('loop_pairs')
     global total_reads
     global reads_with_bc_not_used
-    global reads_with_bc_not_found
-
+    global reads_with_bad_bc
+    
     uidLen = parms['uidLength']
     readFiles, barcodeFiles = load_input_filenames(parms)
 
@@ -399,8 +409,7 @@ def loop_pairs(parms, first_pass):
     
             #Process all the reads in the fastq reads file one read at a time.  
             #Reads have four lines in each file. As each line is read collect the pertinent info.
-            #As a line is read from the fastq reads file, the corresponding 
-            #index is read.
+            #As a line is read from the fastq reads file, the corresponding index (barcode file) is read.
             for read, idx in itertools.zip_longest(reads, indexes):
                 read = read.strip() 
                 idx = idx.strip()
@@ -417,7 +426,7 @@ def loop_pairs(parms, first_pass):
                     UidQuality = read[0: uidLen]
                     ReadQuality = read[uidLen: len(read)]
                     
-                    # the 4th line competes the read, assemble the pieces for the Read file record
+                    # the 4th line completes the read, assemble the pieces for the Read file record
                     reads_in_file += 1
 
                     i = 0
@@ -432,9 +441,10 @@ def loop_pairs(parms, first_pass):
                             total_reads += 1
 
                             if barcode in barcodes_not_used:
-                                reads_with_bc_not_used.append(barcode)
+                                reads_with_bc_not_used +=1
                             elif barcode not in barcodes_used:
-                                reads_with_bc_not_found.append(barcode)
+                                reads_with_bad_bc +=1
+
                                 if 'bad' in barcode_files:
                                     barcode_files['bad'].write(merged_read_line)
                                     
@@ -453,7 +463,7 @@ def loop_pairs(parms, first_pass):
             logging.info("  Merged %s reads." %(str(reads_in_file)))
             logging.info('MERGE PASS COMPLETED for %s', readFiles[current_file])
             current_file+=1
-        
+            
         except Exception as err:
             logging.exception(err)
             traceback.print_exc()
@@ -480,11 +490,11 @@ def load_input_filenames(parms):
         readFiles.sort()
         barcodeFiles.sort()  
               
-        #ensure that reads files were found
+        #ensure that reads file(s) were found
         if len(readFiles) == 0:
             raise Exception('No reads files found in input directory.')
         
-        #ensure that barcodes files were found
+        #ensure that barcodes file(s) were found
         if len(barcodeFiles) == 0:
             raise Exception('No barcode files found in input directory.')
         
@@ -524,12 +534,12 @@ def open_file(filepath):
 #this will eventually be converted into the reporting process 
 def write_split_stats(parms):    
     logging.debug('write_split_stats')
-    logging.info('Total Reads: %i' % total_reads)    
-    logging.info('Barcodes in Map file listed as Used: %i' % len(barcodes_used))    
-    logging.info('Barcodes in Map file listed as Not Used: %i' % len(barcodes_not_used))
-    logging.info('Reads with Barcodes in Map file but listed as Not Used: %i' % len(reads_with_bc_not_used))
-    logging.info('Reads with Barcodes in NOT IN Map file: %i' % len(reads_with_bc_not_found))
-
+    logging.log(data_level,'Barcodes in Map file listed as Used: %i' % len(barcodes_used))    
+    logging.log(data_level,'Barcodes in Map file listed as Not Used: %i' % len(barcodes_not_used))
+    logging.log(data_level,'TOTAL READS: %i' % total_reads)
+    percentage = (reads_with_bc_not_used/total_reads*100)
+    logging.log(data_level,'Reads with valid but NOT USED Barcode: %i --Percent of Total Reads: %f' % (reads_with_bc_not_used, percentage))
+    logging.log(data_level,'BAD READS: Reads with Barcode NOT IN Map file: %i --Percent of Total Reads: %f' % (reads_with_bad_bc, (reads_with_bad_bc/total_reads*100)))
 
 def run_sort_unique(parms):
     if skip_step('unique'):
@@ -580,9 +590,12 @@ def run_sort_unique(parms):
                 read = os.path.join(parms['resultsDir'], "split", barcodemap_list[current_file]+'.reads')
                 result_file = os.path.join(unique_directory, barcodemap_list[current_file]+'.unique')
                 family_file = os.path.join(family_directory, barcodemap_list[current_file]+'.family')
-                primerset_file = os.path.join(args.directory, 'Primers.txt')                 
+                primerset_file = os.path.join(args.directory, parms['primerfile'])
                 
-                subprocess_args = argparse.Namespace(input=read, output=result_file, family=family_file, primerset=primerset_file)
+                subprocess_args = argparse.Namespace(input=read, 
+                                                     output=result_file, 
+                                                     family=family_file, 
+                                                     primerset=primerset_file)
                
                 p = multiprocessing.Process(target=unique.perform_unique, name=barcodemap_list[current_file], args=(subprocess_args,))
                 p.start()
@@ -618,7 +631,7 @@ def run_align_uniques(parms):
         os.makedirs(change_directory)
 
     #load a subset of COSMICs for the run, using the runs's primer set to focus on specific positions for specific chromosomes               
-    primerset_file = os.path.join(args.directory, 'Primers.txt')
+    primerset_file = os.path.join(args.directory, parms['primerfile'])
     data_input = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', "COSMIC.txt")
     subset = os.path.join(parms['resultsDir'], "COSMIC.txt")
     if os.path.isfile(data_input):
@@ -659,7 +672,7 @@ def run_align_uniques(parms):
         #if there are still files to process 
         if current_file < len(barcodemap_list):
             #check to see if the read file was completed on a previous run.
-            if is_done('align', str(barcodemap_list[current_file])):
+            if barcodemap_list[current_file] == 'bad' or barcodemap_list[current_file] == 'merge' or is_done('align', str(barcodemap_list[current_file])):
                 current_file+=1
                 continue
             
@@ -730,7 +743,7 @@ def remove_optical_duplicates(parms):
         #if there are still files to process 
         if current_file < len(barcodemap_list):
             #check to see if the read file was completed on a previous run.
-            if is_done('optdup', str(barcodemap_list[current_file])):
+            if barcodemap_list[current_file] == 'bad' or barcodemap_list[current_file] == 'merge' or is_done('optdup', str(barcodemap_list[current_file])):
                 current_file+=1
                 continue
             
@@ -798,7 +811,7 @@ def run_uidstats(parms):
         #if there are still files to process 
         if current_file < len(barcodemap_list):
             #check to see if the read file was completed on a previous run.
-            if is_done('uidstats', str(barcodemap_list[current_file])):
+            if barcodemap_list[current_file] == 'bad' or barcodemap_list[current_file] == 'merge' or is_done('uidstats', str(barcodemap_list[current_file])):
                 current_file+=1
                 continue
             
@@ -885,7 +898,7 @@ def run_supermutants(parms):
         #if there are still files to process 
         if current_file < len(barcodemap_list):
             #check to see if the read file was completed on a previous run.
-            if is_done('supermutant', str(barcodemap_list[current_file])):
+            if barcodemap_list[current_file] == 'bad' or barcodemap_list[current_file] == 'merge' or is_done('supermutant', str(barcodemap_list[current_file])):
                 current_file+=1
                 continue
             
@@ -961,7 +974,7 @@ def run_well_supermutants(parms):
         #if there are still files to process 
         if current_file < len(barcodemap_list):
             #check to see if the read file was completed on a previous run.
-            if is_done('wellsupermutant', str(barcodemap_list[current_file])):
+            if barcodemap_list[current_file] == 'bad' or barcodemap_list[current_file] == 'merge' or is_done('wellsupermutant', str(barcodemap_list[current_file])):
                 current_file+=1
                 continue
             
@@ -1060,7 +1073,9 @@ def run_sample_supermutants(parms):
             if len(multiprocessing.active_children()) < args.workers:
                 
                 sample = sample_list[current_sample]
-                sample_file = os.path.join(sampleMut_directory, sample_list[current_sample].replace(" ", "_")+'.ssmt')
+                #remove illegal characters from the sample name in order to make a legal filename
+                filename = utilities.get_filename(sample_list[current_sample])
+                sample_file = os.path.join(sampleMut_directory, filename +'.ssmt')
                 
                 mutant_args = argparse.Namespace(output=sample_file,  
                                         barcodeMap = barcodemap_file,
@@ -1083,6 +1098,31 @@ def run_sample_supermutants(parms):
     print('Sample Super Mutant finished.')
 
  
+def create_reports(parms):
+    if skip_step('runreports'):
+        return
+    logging.info('Create Reports Started.')
+    print('Create Reports Started.')
+    
+    #aggregate all Well Super Mutant barcode files into one report
+    directory= os.path.join(parms['resultsDir'], "mutantTabs")
+    report_filename='WellSuperMutantsTabulations.csv'
+    utilities.aggregate_files(directory, '.wsmt', report_filename)
+
+    #aggregate all Sample Super Mutant files into one report
+    directory= os.path.join(parms['resultsDir'], "superMutants")
+    report_filename='SampleSuperMutants.csv'
+    utilities.aggregate_files(directory, '.ssmt', report_filename)
+
+    #aggregate all Well Amplicon Tabulations files into one report
+    directory= os.path.join(parms['resultsDir'], "mutantTabs")
+    report_filename='AmpUIDReport.csv'
+    utilities.aggregate_WATs(parms, directory, '.wat', report_filename)
+
+    logging.info('Create Reports finished.')
+    print('Create Reports finished.')
+    
+    
 def main():
     try :
         get_args()
@@ -1105,6 +1145,8 @@ def main():
             datefmt='%m/%d/%y %I:%M:%S %p',
             filename=logfile,
             level=logging.INFO)
+
+        logging.addLevelName(data_level, "DATA")
         
         logging.info('PROCESSING STARTED')
         print('PROCESSING STARTED')
@@ -1135,6 +1177,9 @@ def main():
 
         #identify sample super mutants
         run_sample_supermutants(parms)
+        
+        #create well super mutant AND sample super mutant reports 
+        create_reports(parms)
         
         
         logging.info('PROCESSING COMPLETE')

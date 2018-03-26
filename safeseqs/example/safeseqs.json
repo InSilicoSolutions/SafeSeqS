@@ -4,4 +4,5 @@
  "barcodes_files" : [""],
  "uidLength" : 14,
  "barcodemap" : "exampleBarcodeMap.txt",
+ "primerfile" : "Primers.txt",
  "ascii_adj" : 33}

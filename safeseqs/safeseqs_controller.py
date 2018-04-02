@@ -1106,17 +1106,17 @@ def create_reports(parms):
     
     #aggregate all Well Super Mutant barcode files into one report
     directory= os.path.join(parms['resultsDir'], "mutantTabs")
-    report_filename='WellSuperMutantsTabulations.csv'
+    report_filename='WellSuperMutantsTabulations.tsv'
     utilities.aggregate_files(directory, '.wsmt', report_filename)
 
     #aggregate all Sample Super Mutant files into one report
     directory= os.path.join(parms['resultsDir'], "superMutants")
-    report_filename='SampleSuperMutants.csv'
+    report_filename='SampleSuperMutants.tsv'
     utilities.aggregate_files(directory, '.ssmt', report_filename)
 
     #aggregate all Well Amplicon Tabulations files into one report
     directory= os.path.join(parms['resultsDir'], "mutantTabs")
-    report_filename='AmpUIDReport.csv'
+    report_filename='AmpUIDReport.tsv'
     utilities.aggregate_WATs(parms, directory, '.wat', report_filename)
 
     logging.info('Create Reports finished.')
